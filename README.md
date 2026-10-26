@@ -184,6 +184,14 @@ python -m host
 python -m host --headless --window "Nome da janela" --quality fluida
 ```
 
+Para abrir a janela sem terminal (com dois cliques), crie um atalho na Área de Trabalho:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\create_shortcut.ps1
+```
+
+O atalho usa o `pythonw.exe` do `.venv`, que não mostra janela de terminal. Os logs continuam em `%LOCALAPPDATA%\Peek\logs`.
+
 No modo `--headless`, o link da transmissão é exibido no terminal.
 
 ### Opções de linha de comando
