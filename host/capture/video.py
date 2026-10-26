@@ -408,10 +408,20 @@ class VideoCapture:
         self._waiter: asyncio.Future[None] | None = None
         self._stopping = threading.Event()
         self._closed = False
+        self._closed_event = asyncio.Event()
 
     @property
     def latest(self) -> CapturedFrame | None:
         return self._latest
+
+    @property
+    def stopping(self) -> bool:
+        """``True`` se o fim foi pedido por :meth:`stop` (e não pela fonte ter sumido)."""
+        return self._stopping.is_set()
+
+    async def wait_closed(self) -> None:
+        """Espera a captura terminar: por :meth:`stop` ou porque a fonte sumiu."""
+        await self._closed_event.wait()
 
     @property
     def running(self) -> bool:
@@ -502,6 +512,7 @@ class VideoCapture:
 
     def _mark_closed(self) -> None:
         self._closed = True
+        self._closed_event.set()
         self._wake()
 
     def _wake(self) -> None:
