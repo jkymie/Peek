@@ -149,8 +149,21 @@ cd peek
 python -m venv .venv
 .venv\Scripts\activate
 
-pip install -r requirements.txt
+pip install -r requirements-dev.txt   # inclui requirements.txt + ferramentas de desenvolvimento
 ```
+
+### Verificações
+
+```bash
+ruff check . && ruff format --check .
+pytest                   # inclui testes com captura real (marcador "capture")
+pytest -m "not capture"  # sem sessão gráfica do Windows (ex.: CI)
+
+# Salva um frame de cada monitor (ou --window "título", ou --all) em snapshots/
+python -m tools.snapshot
+```
+
+Os logs ficam em `%LOCALAPPDATA%\Peek\logs\peek.log` (uma linha JSON por evento).
 
 ### Compilando o helper de áudio
 
@@ -190,6 +203,8 @@ Estas opções existem só para desenvolvimento e testes. Tudo o que elas fazem 
 | `--no-tunnel` | desligado | Não inicia o `cloudflared` (para testes em rede local) |
 | `--include-discord` | desligado | Inclui o áudio do Discord na transmissão |
 | `--no-audio` | desligado | Transmite só o vídeo |
+| `--list-sources` | — | Lista as telas e janelas disponíveis e sai |
+| `--debug` | desligado | Logs detalhados |
 
 ### Gerando o `Peek.exe`
 

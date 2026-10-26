@@ -218,3 +218,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Peek
+# Binários gerados/baixados (peek-audio.exe, cloudflared.exe)
+host/bin/*
+!host/bin/.gitkeep
+# Saídas de ferramentas de desenvolvimento
+snapshots/

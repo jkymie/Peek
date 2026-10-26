@@ -1,0 +1,9 @@
+# Dependências do Peek (quem transmite). Versões fixadas para builds reprodutíveis.
+aiohttp==3.14.5
+aiortc==1.15.0
+av==17.1.0  # aiortc 1.15 exige av < 18
+numpy==2.5.4
+opencv-python==5.0.0.93  # já é dependência do windows-capture; usado para salvar imagens
+PySide6==6.12.0
+qasync==0.28.0
+windows-capture==2.0.1

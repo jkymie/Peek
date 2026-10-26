@@ -142,13 +142,13 @@ Fica para depois da 1.0: a Fase 10, a CI completa com testes de interface e os w
 
 **Objetivo:** ter um repositório organizado, reprodutível e com verificações automáticas desde o primeiro commit de código.
 
-- [ ] Criar a estrutura de pastas do README (`host/`, `audio-helper/`, `web/`)
-- [ ] `requirements.txt` com versões fixadas (`PySide6`, `windows-capture`, `aiortc`, `av`, `aiohttp`, `qasync`) e `requirements-dev.txt` (`pytest`, `pytest-asyncio`, `ruff`, `pyinstaller`)
-- [ ] Configurar `ruff` (lint/format) e `pytest`
+- [ ] Criar a estrutura de pastas do README (`host/`, `audio-helper/`, `web/`) — `host/` criado em 26/10; `web/` e `audio-helper/` entram junto com o código deles
+- [x] `requirements.txt` com versões fixadas (`PySide6`, `windows-capture`, `aiortc`, `av`, `aiohttp`, `qasync`) e `requirements-dev.txt` (`pytest`, `pytest-asyncio`, `ruff`, `pyinstaller`)
+- [x] Configurar `ruff` (lint/format) e `pytest`
 - [ ] CI no GitHub Actions em `windows-latest`: lint + testes Python + compilação do `audio-helper`
 - [ ] Escolher e adicionar o arquivo `LICENSE`; adicionar `THIRD_PARTY_NOTICES` (licença Apache 2.0 do `cloudflared`)
-- [ ] `.gitignore` (`.venv`, `build/`, `dist/`, binários em `host/bin/`)
-- [ ] Logging estruturado em arquivo (`%LOCALAPPDATA%\Peek\logs`) desde o início, já que o usuário final não verá terminal
+- [x] `.gitignore` (`.venv`, `build/`, `dist/`, binários em `host/bin/`)
+- [x] Logging estruturado em arquivo (`%LOCALAPPDATA%\Peek\logs`) desde o início, já que o usuário final não verá terminal
 
 **Pronto quando:** `python -m host --help` roda e a CI passa em um PR vazio.
 
@@ -158,8 +158,8 @@ Fica para depois da 1.0: a Fase 10, a CI completa com testes de interface e os w
 
 **Objetivo:** provar a parte mais arriscada do núcleo: tela capturada → `aiortc` → navegador, em rede local, sem túnel e sem áudio.
 
-- [ ] `capture/video.py`: captura de monitor e de janela com `windows-capture`, entregando frames em uma fila consumível pelo `asyncio` (a biblioteca usa callbacks em outra thread)
-- [ ] Listagem de monitores e janelas disponíveis (será usada pela interface na Fase 7)
+- [x] `capture/video.py`: captura de monitor e de janela com `windows-capture`, entregando frames em uma fila consumível pelo `asyncio` (a biblioteca usa callbacks em outra thread)
+- [x] Listagem de monitores e janelas disponíveis (será usada pela interface na Fase 7)
 - [ ] `rtc/tracks.py`: `VideoStreamTrack` que lê a fila, respeita o FPS alvo e descarta frames atrasados
 - [ ] `server.py`: `aiohttp` servindo `web/` e um WebSocket de sinalização (oferta/resposta/ICE), **uma `RTCPeerConnection` por espectador**
 - [ ] `web/` mínimo: página que conecta e exibe o vídeo

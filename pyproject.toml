@@ -1,0 +1,21 @@
+[project]
+name = "peek"
+version = "0.1.0"
+description = "Transmissão de tela com áudio para assistir junto com os amigos, ao lado do Discord."
+requires-python = ">=3.11"
+license = "MIT"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "capture: precisa de uma sessão gráfica do Windows (captura de tela real)",
+]
