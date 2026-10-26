@@ -1,261 +1,214 @@
-# Compartilha Tela
+# 👀 Peek
 
-Aplicação web para transmitir a tela do computador para um grupo pequeno de amigos (até 10 pessoas). O áudio da conversa continua no Discord; este projeto cuida **apenas da transmissão de tela**.
+Transmissão de tela com áudio para assistir junto com os amigos, feita para usar **ao lado do Discord**: vocês continuam conversando na call do Discord, e o Peek cuida só da imagem e do som da tela.
 
-> **Status:** em construção. Este README descreve a arquitetura e o fluxo planejados. Algumas seções serão ajustadas à medida que o código for escrito.
+Quem transmite roda o app do Peek no Windows. Quem assiste só precisa abrir um link no navegador.
 
----
-
-## Sumário
-
-- [Visão geral](#visão-geral)
-- [Arquitetura](#arquitetura)
-- [Stack](#stack)
-- [Pré-requisitos](#pré-requisitos)
-- [Estrutura do repositório](#estrutura-do-repositório)
-- [Configuração](#configuração)
-- [Como rodar](#como-rodar)
-- [Como os amigos se conectam](#como-os-amigos-se-conectam)
-- [Desenvolvimento](#desenvolvimento)
-- [Segurança](#segurança)
-- [Limitações conhecidas](#limitações-conhecidas)
-- [Solução de problemas](#solução-de-problemas)
-- [Roadmap](#roadmap)
+> **Status:** em desenvolvimento. Este README descreve a arquitetura e o funcionamento planejados; algumas seções podem mudar conforme o projeto evolui.
 
 ---
 
-## Visão geral
+## Por que o Peek?
 
-- Uma pessoa por vez (ou mais) clica em **Transmitir minha tela** no navegador.
-- Os demais participantes da sala assistem em tempo real.
-- O servidor roda no PC do anfitrião, apenas quando o grupo for usar.
-- O acesso é restrito ao grupo por meio de uma rede privada (Tailscale) e de uma senha da sala.
+- **Sem eco da call.** Por padrão, o Peek captura todo o áudio do computador **exceto o do Discord**. Seus amigos ouvem o jogo, o vídeo ou a música, mas não ouvem a própria voz de volta.
+- **Tela cheia ou uma janela específica.** Você escolhe o que mostrar.
+- **Nada para instalar do lado de quem assiste.** É só abrir o link no navegador.
+- **Custo zero.** O vídeo vai direto do seu PC para os seus amigos (P2P), sem servidor de mídia pago.
 
-## Arquitetura
+---
 
+## Como funciona
+
+```mermaid
+flowchart LR
+    subgraph PC["PC de quem transmite (Windows)"]
+        WC["windows-capture<br/>(vídeo da tela/janela)"] --> APP
+        AH["peek-audio.exe<br/>(áudio do sistema, sem o Discord)"] -->|PCM via stdout| APP
+        APP["App Peek (Python)<br/>aiortc + aiohttp"]
+    end
+
+    APP <-->|página + sinalização| CF["Cloudflare Tunnel<br/>(link HTTPS público)"]
+    CF <--> V1["Amigo 1<br/>navegador"]
+    CF <--> V2["Amigo 2<br/>navegador"]
+
+    APP -. "vídeo + áudio via WebRTC (P2P)" .-> V1
+    APP -. "vídeo + áudio via WebRTC (P2P)" .-> V2
 ```
- Quem transmite (navegador)
-          │  vídeo da tela (WebRTC, enviado uma única vez)
-          ▼
- ┌─────────────────────────── PC do anfitrião ───────────────────────────┐
- │                                                                        │
- │   LiveKit Server (SFU)  ◄── tokens ──  Back-end Python (FastAPI)       │
- │   repassa o vídeo                      gera tokens e serve a página    │
- │                                                                        │
- └────────────────────────────────────────────────────────────────────────┘
-          │  uma cópia do vídeo para cada espectador
-          ▼
- Espectadores (navegador)
 
- Toda a comunicação passa pela rede privada do Tailscale.
-```
-
-O fluxo de entrada na sala é:
-
-1. O participante abre a página servida pelo FastAPI e informa nome e senha da sala.
-2. O back-end valida a senha e gera um **token de acesso** do LiveKit com as permissões do participante.
-3. O navegador usa o token para se conectar ao LiveKit Server.
-4. Quem clicar em **Transmitir minha tela** publica a tela; os demais recebem o vídeo.
-
-## Stack
-
-| Camada | Tecnologia | Função |
+| Componente | Tecnologia | Função |
 |---|---|---|
-| Servidor de mídia | [LiveKit Server](https://github.com/livekit/livekit) | SFU: recebe e repassa o vídeo via WebRTC |
-| Back-end | Python 3.12+, FastAPI, Uvicorn | Geração de tokens e entrega do front-end |
-| SDK do back-end | `livekit-api` | Criação de tokens de acesso |
-| Configuração | `pydantic-settings` + arquivo `.env` | Leitura de variáveis de ambiente |
-| Front-end | HTML, CSS e JavaScript puro + `livekit-client` | Interface, captura de tela (`getDisplayMedia`) e reprodução |
-| Rede e HTTPS | [Tailscale](https://tailscale.com) | Acesso privado dos amigos e certificado HTTPS |
-| Dependências Python | [uv](https://docs.astral.sh/uv/) | Ambiente virtual, dependências e lockfile |
-| Qualidade | Ruff, pytest, pre-commit, gitleaks | Lint, formatação, testes e bloqueio de segredos |
-| CI | GitHub Actions | Lint e testes a cada push |
+| Captura de vídeo | [`windows-capture`](https://pypi.org/project/windows-capture/) (Windows Graphics Capture) | Captura a tela inteira ou uma janela específica |
+| Captura de áudio | `peek-audio.exe` (C++, WASAPI Application Loopback) | Captura o áudio do sistema excluindo a árvore de processos do Discord |
+| WebRTC | [`aiortc`](https://github.com/aiortc/aiortc) + [`PyAV`](https://github.com/PyAV-Org/PyAV) | Codifica e envia vídeo e áudio para cada espectador |
+| Servidor | [`aiohttp`](https://docs.aiohttp.org/) | Serve a página do espectador e faz a sinalização via WebSocket |
+| Acesso externo | [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) (`cloudflared`) | Gera um link HTTPS público sem abrir portas no roteador |
+| Espectador | HTML + JavaScript (WebRTC nativo do navegador) | Recebe e reproduz a transmissão |
 
-## Pré-requisitos
+O tunnel carrega apenas a página e a sinalização. O vídeo e o áudio trafegam diretamente entre o seu PC e o de cada amigo, usando o STUN público do Google para atravessar o NAT.
 
-No PC do anfitrião:
+---
 
-- [Git](https://git-scm.com/)
-- [Python 3.12 ou superior](https://www.python.org/downloads/)
-- [uv](https://docs.astral.sh/uv/getting-started/installation/)
-- LiveKit Server, de uma destas formas:
-  - **binário** `livekit-server` ([instruções de instalação](https://docs.livekit.io/home/self-hosting/local/)), ou
-  - **Docker** com Docker Compose
-- [Tailscale](https://tailscale.com/download) instalado e autenticado
-- Upload de internet suficiente (ver [Limitações conhecidas](#limitações-conhecidas))
+## Requisitos
 
-Em cada participante:
+**Para transmitir**
 
-- Navegador baseado em Chromium (Chrome ou Edge) atualizado
-- Tailscale instalado, com acesso à máquina do anfitrião
+- Windows 11. A exclusão do áudio do Discord usa a API *Application Loopback*, documentada pela Microsoft a partir do Windows 10 build 20348.
+- Python 3.11 ou superior
+- [`cloudflared`](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/) instalado e no `PATH`
+- Para compilar o `peek-audio.exe`: Visual Studio 2022 (ou Build Tools) com a carga de trabalho *Desenvolvimento para desktop com C++*
+- Upload de internet suficiente: conte com cerca de **3–5 Mbps por espectador** em 720p/1080p a 30 fps
 
-## Estrutura do repositório
+**Para assistir**
+
+- Um navegador moderno (Chrome, Edge ou Firefox)
+
+---
+
+## Instalação
+
+```bash
+git clone https://github.com/<seu-usuario>/peek.git
+cd peek
+
+python -m venv .venv
+.venv\Scripts\activate
+
+pip install -r requirements.txt
+```
+
+### Compilando o helper de áudio
+
+```bash
+cd audio-helper
+cmake -B build -G "Visual Studio 17 2022"
+cmake --build build --config Release
+copy build\Release\peek-audio.exe ..\host\bin\
+```
+
+---
+
+## Uso
+
+**1. Inicie o Peek**
+
+```bash
+# Tela inteira (monitor principal)
+python -m host
+
+# Uma janela específica (pelo título)
+python -m host --window "Nome da janela"
+```
+
+**2. Exponha o Peek para os seus amigos** (em outro terminal)
+
+```bash
+cloudflared tunnel --url http://localhost:8080
+```
+
+O `cloudflared` vai exibir um endereço parecido com `https://algumas-palavras.trycloudflare.com`.
+
+**3. Compartilhe o link**
+
+Envie aos seus amigos o link mostrado pelo Peek no terminal. Ele inclui o token da sala, por exemplo:
 
 ```
-compartilha-tela/
-├── backend/
-│   ├── app/
-│   │   ├── main.py          # FastAPI: rotas e arquivos estáticos
-│   │   ├── config.py        # leitura do .env (pydantic-settings)
-│   │   └── tokens.py        # geração de tokens do LiveKit
-│   └── tests/
-├── frontend/
+https://algumas-palavras.trycloudflare.com/?room=8f3k2p
+```
+
+**4. Entrem na call do Discord e assistam.**
+
+### Opções
+
+| Opção | Padrão | Descrição |
+|---|---|---|
+| `--window "<título>"` | — | Transmite apenas a janela com esse título |
+| `--monitor <n>` | `1` | Monitor a transmitir, quando não houver `--window` |
+| `--resolution <LxA>` | `1280x720` | Resolução de saída |
+| `--fps <n>` | `30` | Quadros por segundo |
+| `--bitrate <kbps>` | `3000` | Bitrate máximo de vídeo por espectador |
+| `--port <n>` | `8080` | Porta do servidor local |
+| `--include-discord` | desligado | Inclui o áudio do Discord na transmissão |
+| `--no-audio` | desligado | Transmite só o vídeo |
+
+---
+
+## Estrutura do projeto
+
+```
+peek/
+├── host/                  # App de quem transmite (Python)
+│   ├── __main__.py        # Ponto de entrada e argumentos de linha de comando
+│   ├── server.py          # aiohttp: página do espectador + sinalização WebSocket
+│   ├── capture/
+│   │   ├── video.py       # Captura com windows-capture
+│   │   └── audio.py       # Inicia o peek-audio.exe e lê o PCM
+│   ├── rtc/
+│   │   └── tracks.py      # VideoStreamTrack e AudioStreamTrack do aiortc
+│   └── bin/
+│       └── peek-audio.exe # Gerado pela compilação do audio-helper
+├── audio-helper/          # Captura de áudio com exclusão do Discord (C++)
+│   ├── CMakeLists.txt
+│   └── src/main.cpp
+├── web/                   # Página do espectador
 │   ├── index.html
-│   ├── app.js
-│   ├── style.css
-│   └── vendor/              # livekit-client em versão fixa
-├── infra/
-│   ├── docker-compose.yml   # LiveKit Server via Docker
-│   └── livekit.yaml         # configuração do LiveKit
-├── .github/workflows/ci.yml
-├── .env.example
-├── .gitignore
-├── .pre-commit-config.yaml
-├── pyproject.toml
-├── uv.lock
+│   ├── viewer.js
+│   └── style.css
+├── requirements.txt
 └── README.md
 ```
 
-## Configuração
+### Protocolo do helper de áudio
 
-Copie o arquivo de exemplo e preencha os valores:
+O `peek-audio.exe` escreve áudio bruto no `stdout` para o app Python ler:
 
-```bash
-cp .env.example .env
-```
+- Formato: PCM *float32*, little-endian, intercalado
+- Taxa de amostragem: 48 000 Hz
+- Canais: 2 (estéreo)
 
-| Variável | Descrição | Exemplo |
-|---|---|---|
-| `LIVEKIT_URL` | Endereço WebSocket do LiveKit visto pelos navegadores | `wss://meu-pc.exemplo.ts.net:8443` |
-| `LIVEKIT_API_KEY` | Chave de API do LiveKit | `devkey` |
-| `LIVEKIT_API_SECRET` | Segredo da API do LiveKit (**nunca** vai para o front-end) | `troque-por-um-valor-longo` |
-| `ROOM_NAME` | Nome da sala padrão | `amigos` |
-| `ROOM_PASSWORD` | Senha que os participantes digitam para entrar | `troque-esta-senha` |
-| `APP_HOST` | Endereço em que o FastAPI escuta | `127.0.0.1` |
-| `APP_PORT` | Porta do FastAPI | `8000` |
+Para descobrir o processo a excluir, o helper localiza o `Discord.exe` raiz (o processo cujo pai não é outro `Discord.exe`) e usa o modo `PROCESS_LOOPBACK_MODE_EXCLUDE_TARGET_PROCESS_TREE`, que remove o Discord e todos os seus subprocessos da captura.
 
-Em `infra/livekit.yaml`, defina as mesmas chaves (`keys`) e informe o IP do seu PC na rede do Tailscale em `rtc.node_ip`, para que o vídeo trafegue pela rede privada:
-
-```yaml
-port: 7880
-rtc:
-  tcp_port: 7881
-  udp_port: 7882
-  node_ip: 100.x.y.z   # IP do PC no Tailscale (veja com: tailscale ip -4)
-keys:
-  devkey: troque-por-um-valor-longo
-```
-
-## Como rodar
-
-### 1. Clonar e instalar as dependências
-
-```bash
-git clone git@github.com:SEU-USUARIO/compartilha-tela.git
-cd compartilha-tela
-uv sync
-uv run pre-commit install
-```
-
-### 2. Subir o LiveKit Server
-
-Com o binário:
-
-```bash
-livekit-server --config infra/livekit.yaml
-```
-
-Ou com Docker:
-
-```bash
-docker compose -f infra/docker-compose.yml up -d
-```
-
-### 3. Subir o back-end
-
-```bash
-uv run uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000
-```
-
-Durante o desenvolvimento, adicione `--reload` para recarregar ao salvar arquivos.
-
-### 4. Publicar com HTTPS na rede do Tailscale
-
-O navegador só libera a captura de tela em páginas HTTPS, e uma página HTTPS só pode se conectar ao LiveKit via `wss://`. Por isso, tanto a aplicação quanto o LiveKit são expostos com o `tailscale serve`:
-
-```bash
-# Aplicação web em https://<maquina>.<tailnet>.ts.net
-tailscale serve --bg 8000
-
-# LiveKit em wss://<maquina>.<tailnet>.ts.net:8443
-tailscale serve --bg --https=8443 http://localhost:7880
-```
-
-> A sintaxe do `tailscale serve` mudou entre versões. Confirme com `tailscale serve --help` na versão instalada.
-
-### 5. Testar
-
-Abra `https://<maquina>.<tailnet>.ts.net`, entre na sala e clique em **Transmitir minha tela**. Abra a mesma página em outra aba ou outro dispositivo para ver a transmissão.
-
-## Como os amigos se conectam
-
-1. O anfitrião compartilha a máquina com cada amigo pelo painel do Tailscale (*Share* na máquina) ou os convida para a rede.
-2. Cada amigo instala o Tailscale e aceita o convite.
-3. O amigo abre o endereço `https://<maquina>.<tailnet>.ts.net` e entra com a senha da sala.
-4. A call continua normalmente no Discord.
-
-> Confira os limites atuais do plano gratuito do Tailscale; eles já mudaram ao longo do tempo.
-
-## Desenvolvimento
-
-```bash
-uv run ruff check .        # lint
-uv run ruff format .       # formatação
-uv run pytest              # testes
-uv run pre-commit run --all-files
-```
-
-O GitHub Actions executa lint e testes a cada push e pull request (`.github/workflows/ci.yml`).
-
-Para adicionar uma dependência:
-
-```bash
-uv add nome-do-pacote          # dependência da aplicação
-uv add --dev nome-do-pacote    # dependência de desenvolvimento
-```
-
-## Segurança
-
-- O arquivo `.env` está no `.gitignore` e **nunca** deve ser commitado. Use o `.env.example` como referência.
-- O `LIVEKIT_API_SECRET` fica apenas no back-end. O front-end recebe somente tokens temporários.
-- O pre-commit roda o `gitleaks` para bloquear commits que contenham segredos.
-- Os serviços escutam apenas em `127.0.0.1` e são expostos exclusivamente pela rede do Tailscale, sem portas abertas no roteador.
-- Troque a senha da sala e as chaves do LiveKit se alguém sair do grupo.
-- Mantenha LiveKit, Tailscale e as dependências Python atualizados.
+---
 
 ## Limitações conhecidas
 
-- **Upload do anfitrião:** como o servidor roda em casa, todo o vídeo sai pela internet do anfitrião, uma cópia por espectador. Para 9 espectadores em 720p, estime de 13 a 20 Mbps de upload; em 1080p, bem mais. Meça sua conexão antes de usar com o grupo todo.
-- **Disponibilidade:** o serviço só funciona enquanto o PC do anfitrião estiver ligado e com os processos em execução.
-- **Áudio da tela:** a captura do som do sistema funciona bem no Chrome/Edge no Windows, mas é limitada no macOS e no Linux.
-- **Tailscale obrigatório:** todos os participantes precisam instalá-lo.
+- **Uso de CPU.** O `aiortc` codifica o vídeo por software, e cada espectador recebe uma codificação própria. Com vários espectadores ou em resoluções altas, isso pode competir com o jogo pelo processador. Comece em 720p/30 fps e ajuste a partir daí.
+- **Número de espectadores.** Por ser P2P, o upload necessário cresce a cada pessoa assistindo. O Peek foi pensado para grupos pequenos (até ~4 espectadores).
+- **Somente Windows para transmitir.** A captura de vídeo e a exclusão de áudio dependem de APIs do Windows.
+- **Redes restritivas.** Em algumas redes (corporativas, de faculdade ou 4G com NAT restritivo), a conexão direta pode falhar. Nesses casos é preciso configurar um servidor TURN.
+- **Aviso do SmartScreen.** Executáveis sem assinatura de código podem disparar um alerta do Windows na primeira execução.
 
-## Solução de problemas
+---
 
-| Sintoma | Causa provável | O que verificar |
-|---|---|---|
-| Botão de transmitir não funciona | Página aberta sem HTTPS | Acesse pelo endereço `https://...ts.net` |
-| Conecta, mas não aparece vídeo | `rtc.node_ip` incorreto | Compare com `tailscale ip -4` |
-| Erro de conexão ao LiveKit | `LIVEKIT_URL` errado ou sem `wss://` | Revise o `.env` e o `tailscale serve` |
-| Token inválido | Chaves diferentes entre `.env` e `livekit.yaml` | Use o mesmo par de chave e segredo |
-| Vídeo travando | Upload insuficiente | Reduza a resolução ou o número de espectadores |
+## Segurança e privacidade
+
+- Qualquer pessoa com o link completo (incluindo o token `room`) pode assistir. Compartilhe o link apenas com quem você quer.
+- Um novo token é gerado a cada vez que o Peek é iniciado. Encerrar o app invalida o link.
+- Os links `trycloudflare.com` são temporários e não têm garantia de disponibilidade. Para uso contínuo, considere um tunnel nomeado na sua conta Cloudflare.
+- O vídeo e o áudio são criptografados de ponta a ponta pelo próprio WebRTC (DTLS-SRTP).
+- Lembre-se de que tudo o que estiver na tela ou na janela transmitida, incluindo notificações, fica visível para os espectadores.
+
+---
 
 ## Roadmap
 
-- [ ] Esqueleto do repositório (`pyproject.toml`, CI, pre-commit)
-- [ ] Back-end: validação de senha e geração de tokens
-- [ ] Front-end: entrar na sala, transmitir e assistir
-- [ ] Testes do back-end
-- [ ] Indicador de quem está transmitindo
-- [ ] Ajuste de qualidade (resolução e taxa de quadros)
-- [ ] Plano B: LiveKit na nuvem caso o upload doméstico não seja suficiente
+- [ ] Captura de vídeo + `aiortc` + página do espectador funcionando localmente
+- [ ] Acesso externo via Cloudflare Tunnel
+- [ ] `peek-audio.exe` com exclusão do Discord
+- [ ] Integração do áudio com o app Python
+- [ ] Suporte opcional a servidor TURN
+- [ ] Interface gráfica para escolher tela ou janela (PySide6 ou Tkinter)
+- [ ] Iniciar o `cloudflared` automaticamente pelo app
+- [ ] Empacotamento com PyInstaller
+- [ ] Estudo de encoder por hardware (GStreamer `webrtcbin`) para reduzir o uso de CPU
+
+---
+
+## Aviso
+
+O Peek é um projeto independente e **não tem nenhuma afiliação com o Discord**. Ele não interage com o Discord além de identificar o processo para excluir o áudio dele da captura.
+
+---
+
+## Licença
+
+Defina a licença do projeto (por exemplo, [MIT](https://choosealicense.com/licenses/mit/)) e adicione o arquivo `LICENSE` na raiz do repositório.
