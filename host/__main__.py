@@ -139,9 +139,9 @@ async def _headless_session(source, quality, port: int) -> int:
 
 
 def _run_gui(args: argparse.Namespace) -> int:
-    # TODO(Fase 7, quarta): janela PySide6 ligada à StreamSession.
-    log.error("A janela do Peek ainda não está implementada. Use --headless por enquanto.")
-    return 1
+    from host.gui.app import run_gui
+
+    return run_gui(port=args.port)
 
 
 def main(argv: list[str] | None = None) -> int:
