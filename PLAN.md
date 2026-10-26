@@ -160,12 +160,23 @@ Fica para depois da 1.0: a Fase 10, a CI completa com testes de interface e os w
 
 - [x] `capture/video.py`: captura de monitor e de janela com `windows-capture`, entregando frames em uma fila consumível pelo `asyncio` (a biblioteca usa callbacks em outra thread)
 - [x] Listagem de monitores e janelas disponíveis (será usada pela interface na Fase 7)
-- [ ] `rtc/tracks.py`: `VideoStreamTrack` que lê a fila, respeita o FPS alvo e descarta frames atrasados
-- [ ] `server.py`: `aiohttp` servindo `web/` e um WebSocket de sinalização (oferta/resposta/ICE), **uma `RTCPeerConnection` por espectador**
-- [ ] `web/` mínimo: página que conecta e exibe o vídeo
-- [ ] **Camada de controle** `StreamSession` (ex.: `start(source, quality)`, `stop()`, `set_quality()`, eventos `viewers_changed`, `error`, `link_ready`). Tudo que a interface fizer passa por ela
-- [ ] `__main__.py` com `--headless`, `--window`, `--monitor`, `--port`, `--no-tunnel`
-- [ ] Medir uso de CPU com 1, 2 e 4 espectadores em 720p30 (base para a Fase 6)
+- [x] `rtc/tracks.py`: `VideoStreamTrack` que lê a fila, respeita o FPS alvo e descarta frames atrasados
+- [x] `server.py`: `aiohttp` servindo `web/` e um WebSocket de sinalização (oferta/resposta/ICE), **uma `RTCPeerConnection` por espectador**
+- [x] `web/` mínimo: página que conecta e exibe o vídeo
+- [x] **Camada de controle** `StreamSession` (ex.: `start(source, quality)`, `stop()`, `set_quality()`, eventos `viewers_changed`, `error`, `link_ready`). Tudo que a interface fizer passa por ela — `set_quality()` fica para a Fase 6
+- [x] `__main__.py` com `--headless`, `--window`, `--monitor`, `--port`, `--no-tunnel`
+- [x] Medir uso de CPU com 1, 2 e 4 espectadores em 720p30 (base para a Fase 6)
+
+  Medição de 26/10 (8 núcleos, tela 1920x1080 com uma área de 800x600 em movimento contínuo, preset Equilibrada, espectadores `aiortc` na mesma máquina, VP8). CPU só do processo do Peek:
+
+  | Espectadores | CPU (% de 1 núcleo) | CPU (% do total) | FPS recebido |
+  |---|---|---|---|
+  | 0 (só capturando) | 21% | 2,7% | — |
+  | 1 | 99% | 12,4% | 29,8 |
+  | 2 | 131% | 16,4% | 30,0 |
+  | 4 | 177% | 22,1% | ~27 |
+
+  Os espectadores rodavam no mesmo PC e disputavam CPU com o Peek, então os números são aproximados. Com 4 espectadores, o FPS já cai um pouco abaixo de 30. Refazer com espectadores reais na sessão de quinta.
 
 **Pronto quando:** um segundo dispositivo na mesma rede abre `http://<ip>:8080` e vê a tela com latência aceitável.
 
@@ -200,7 +211,7 @@ Fica para depois da 1.0: a Fase 10, a CI completa com testes de interface e os w
 - [ ] `tunnel.py`: iniciar `cloudflared` como subprocesso **sem janela de console** (`CREATE_NO_WINDOW`), ler a URL `trycloudflare.com` da saída, com timeout
 - [ ] Monitorar o processo: detectar queda, tentar reiniciar e emitir evento de erro amigável
 - [ ] Encerrar o `cloudflared` ao parar ou fechar o Peek (inclusive em fechamento abrupto, via *job object* do Windows)
-- [ ] **Código da sala**: incluir um token aleatório no caminho do link (ex.: `/s/<token>`) e recusar sinalização sem token válido; invalidar ao parar
+- [x] **Código da sala**: incluir um token aleatório no caminho do link (ex.: `/s/<token>`) e recusar sinalização sem token válido; invalidar ao parar
 - [ ] Endurecer a sinalização: limite de espectadores simultâneos, limite de tamanho de mensagem e de conexões por IP
 - [ ] Garantir que a página do espectador **não expõe nenhum controle** de quem transmite
 - [ ] Testar espectador em outra rede (4G, rede de amigo)
