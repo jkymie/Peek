@@ -7,6 +7,7 @@ elas fazem também precisa estar disponível pela janela do Peek.
 from __future__ import annotations
 
 import argparse
+import asyncio
 import logging
 import sys
 
@@ -99,9 +100,42 @@ def _run_headless(args: argparse.Namespace) -> int:
         source.name,
         extra={"source_kind": source.kind, "source_id": source.id},
     )
-    # TODO(Fase 1, terça): StreamSession + servidor + sinalização.
-    log.error("A transmissão em modo --headless ainda não está implementada.")
-    return 1
+    if not args.no_tunnel:
+        # TODO(Fase 3, quarta): cloudflared. Até lá, só rede local.
+        log.warning("O link público ainda não está implementado; usando só a rede local.")
+    if not args.no_audio:
+        log.info("Áudio ainda não implementado; transmitindo só o vídeo.")
+
+    from host.rtc.quality import resolve_quality
+
+    quality = resolve_quality(
+        args.quality, resolution=args.resolution, fps=args.fps, bitrate_kbps=args.bitrate
+    )
+    try:
+        return asyncio.run(_headless_session(source, quality, args.port))
+    except KeyboardInterrupt:
+        return 0
+
+
+async def _headless_session(source, quality, port: int) -> int:
+    from host.gui.messages import error_message
+    from host.session import SessionError, StreamSession
+
+    session = StreamSession(port=port, public=False)
+    finished = asyncio.Event()
+    session.viewers_changed.connect(lambda n: log.info("Pessoas assistindo: %d", n))
+    session.error.connect(lambda code: (log.error(error_message(code)), finished.set()))
+
+    try:
+        link = await session.start(source, quality)
+    except SessionError:
+        return 1
+    print(f"\n  Link para assistir: {link}\n  Ctrl+C para parar.\n", flush=True)
+    try:
+        await finished.wait()  # só termina sozinho se der erro (ex.: janela fechada)
+        return 1
+    finally:
+        await session.stop()
 
 
 def _run_gui(args: argparse.Namespace) -> int:
