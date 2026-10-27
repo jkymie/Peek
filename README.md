@@ -16,7 +16,7 @@ O Peek é pensado para que **qualquer pessoa consiga transmitir, mesmo sem saber
 2. **No máximo três passos para começar:** escolher o que mostrar, (opcionalmente) escolher a qualidade e clicar em **Começar a transmitir**.
 3. **Tudo automático por baixo dos panos.** Exclusão do áudio do Discord, criação do link público, geração do código da sala e ajustes de rede acontecem sem a pessoa precisar saber que existem.
 4. **Padrões que funcionam.** As configurações iniciais devem servir para a maioria dos casos. Ninguém deveria *precisar* mexer em nada.
-5. **Linguagem do dia a dia.** A interface não usa termos técnicos como "bitrate", "WebRTC" ou "tunnel". Em vez de "1080p · 5000 kbps", ela diz "Nítida".
+5. **Linguagem do dia a dia.** A interface não usa termos técnicos como "bitrate", "WebRTC" ou "tunnel". Cada opção de qualidade tem um nome do dia a dia ("Nítida"), e ao lado dele pode aparecer a resolução e o FPS, que muita gente já reconhece: "Nítida · 1080p · 30 fps". Números de envio, como "5000 kbps", nunca aparecem.
 6. **Erros que explicam o que fazer.** Em vez de um código de erro, uma frase clara: *"Não foi possível criar o link. Verifique sua conexão com a internet e tente novamente."*
 7. **Nenhuma janela de terminal** aparece para quem transmite.
 
