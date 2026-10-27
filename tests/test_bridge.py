@@ -24,6 +24,7 @@ class FakeSession:
         self.viewers_changed = Signal("viewers_changed")
         self.error = Signal("error")
         self.state = SessionState.IDLE
+        self.public = True
         self.started_with = None
         self.quality = None
         self.source = None

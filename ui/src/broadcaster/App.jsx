@@ -188,7 +188,7 @@ function LiveScreen({ state, peek, texts }) {
             </button>
           </div>
           <p className="muted small">{texts.SHARE_HINT}</p>
-          <p className="muted small">{texts.LOCAL_NETWORK_HINT}</p>
+          {state.localOnly && <p className="muted small">{texts.LOCAL_NETWORK_HINT}</p>}
         </section>
 
         <section className="section">

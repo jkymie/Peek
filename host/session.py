@@ -20,6 +20,7 @@ from host.resources import web_dir
 from host.rtc.quality import Quality, apply_bitrate_cap
 from host.rtc.tracks import FrameConverter, ScreenTrack
 from host.server import ViewerServer, lan_ip
+from host.tunnel import Tunnel, TunnelError
 
 log = logging.getLogger(__name__)
 
@@ -38,6 +39,8 @@ class ErrorCode(StrEnum):
     NO_FRAMES = "no_frames"
     SOURCE_CLOSED = "source_closed"
     SERVER_FAILED = "server_failed"
+    TUNNEL_FAILED = "tunnel_failed"
+    TUNNEL_LOST = "tunnel_lost"
     UNEXPECTED = "unexpected"
 
 
@@ -82,7 +85,7 @@ class StreamSession:
 
     def __init__(self, *, port: int = 8080, public: bool = False) -> None:
         self.port = port
-        # public=True: servidor só em 127.0.0.1, exposto pelo cloudflared (Fase 3).
+        # public=True: servidor só em 127.0.0.1, exposto pelo cloudflared.
         # public=False: servidor na rede local, para testes com --no-tunnel.
         self.public = public
         self.state_changed = Signal("state_changed")
@@ -94,7 +97,9 @@ class StreamSession:
         self._capture: VideoCapture | None = None
         self._converter: FrameConverter | None = None
         self._server: ViewerServer | None = None
+        self._tunnel: Tunnel | None = None
         self._watch_task: asyncio.Task | None = None
+        self._tunnel_watch_task: asyncio.Task | None = None
         self._link: str | None = None
         self._source: CaptureSource | None = None
         self._quality: Quality | None = None
@@ -243,9 +248,18 @@ class StreamSession:
         except OSError as exc:
             raise SessionError(ErrorCode.SERVER_FAILED, str(exc)) from exc
 
+        if self.public:
+            self._tunnel = Tunnel()
+            try:
+                base = await self._tunnel.start(f"http://127.0.0.1:{self._server.port}")
+            except TunnelError as exc:
+                raise SessionError(ErrorCode.TUNNEL_FAILED, str(exc)) from exc
+            self._tunnel_watch_task = asyncio.create_task(self._watch_tunnel(self._tunnel))
+        else:
+            base = f"http://{lan_ip()}:{self._server.port}"
+
         self._watch_task = asyncio.create_task(self._watch_capture(self._capture))
-        # TODO(Fase 3): com public=True, iniciar o cloudflared e usar a URL dele.
-        return f"http://{lan_ip()}:{self._server.port}{self._server.viewer_path()}"
+        return base + self._server.viewer_path()
 
     async def _watch_capture(self, capture: VideoCapture) -> None:
         await capture.wait_closed()
@@ -255,16 +269,29 @@ class StreamSession:
         await self._teardown()
         self.error.emit(ErrorCode.SOURCE_CLOSED)
 
+    async def _watch_tunnel(self, tunnel: Tunnel) -> None:
+        await tunnel.wait_closed()
+        if tunnel.stopping or self._state is not SessionState.LIVE:
+            return
+        log.warning("O link público caiu")
+        await self._teardown()
+        self.error.emit(ErrorCode.TUNNEL_LOST)
+
     async def _teardown(self) -> None:
         self._set_state(SessionState.STOPPING)
-        watch, self._watch_task = self._watch_task, None
-        if watch is not None and watch is not asyncio.current_task():
-            watch.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await watch
+        for name in ("_watch_task", "_tunnel_watch_task"):
+            watch = getattr(self, name)
+            setattr(self, name, None)
+            if watch is not None and watch is not asyncio.current_task():
+                watch.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await watch
         server, self._server = self._server, None
         if server is not None:
-            await server.stop()
+            await server.stop()  # avisa os espectadores pelo link antes de fechá-lo
+        tunnel, self._tunnel = self._tunnel, None
+        if tunnel is not None:
+            await tunnel.stop()
         capture, self._capture = self._capture, None
         if capture is not None:
             await capture.stop()

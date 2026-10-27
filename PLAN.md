@@ -208,9 +208,9 @@ Fica para depois da 1.0: a Fase 10, a CI completa com testes de interface e os w
 
 **Objetivo:** gerar um link HTTPS público sem que quem transmite saiba o que é um túnel.
 
-- [ ] `tunnel.py`: iniciar `cloudflared` como subprocesso **sem janela de console** (`CREATE_NO_WINDOW`), ler a URL `trycloudflare.com` da saída, com timeout
-- [ ] Monitorar o processo: detectar queda, tentar reiniciar e emitir evento de erro amigável
-- [ ] Encerrar o `cloudflared` ao parar ou fechar o Peek (inclusive em fechamento abrupto, via *job object* do Windows)
+- [x] `tunnel.py`: iniciar `cloudflared` como subprocesso **sem janela de console** (`CREATE_NO_WINDOW`), ler a URL `trycloudflare.com` da saída, com timeout — o link só é entregue depois que o endereço existe no DNS (em 27/10 isso levou ~12 s; antes disso o amigo veria "site não encontrado")
+- [ ] Monitorar o processo: detectar queda, tentar reiniciar e emitir evento de erro amigável — detecção e erro (`TUNNEL_LOST`) feitos; reinício fica para depois do Marco 1
+- [x] Encerrar o `cloudflared` ao parar ou fechar o Peek (inclusive em fechamento abrupto, via *job object* do Windows)
 - [x] **Código da sala**: incluir um token aleatório no caminho do link (ex.: `/s/<token>`) e recusar sinalização sem token válido; invalidar ao parar
 - [ ] Endurecer a sinalização: limite de espectadores simultâneos, limite de tamanho de mensagem e de conexões por IP
 - [ ] Garantir que a página do espectador **não expõe nenhum controle** de quem transmite

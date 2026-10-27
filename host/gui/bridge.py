@@ -143,6 +143,7 @@ class Bridge(QObject):
             "liveSource": source_key(live) if live else None,
             "liveSourceLabel": source_label(live, monitor_count) if live else "",
             "link": self.link,
+            "localOnly": not self._session.public,
             "viewers": self.viewers,
             "viewersText": msg.viewers_text(self.viewers),
             "error": self.error,

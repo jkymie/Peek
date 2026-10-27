@@ -40,6 +40,13 @@ ERRORS: dict[ErrorCode, str] = {
         "Não foi possível começar a transmissão. Feche outras cópias do Peek que estejam "
         "abertas e tente novamente."
     ),
+    ErrorCode.TUNNEL_FAILED: (
+        "Não foi possível criar o link. Verifique sua conexão com a internet e tente novamente."
+    ),
+    ErrorCode.TUNNEL_LOST: (
+        "O link parou de funcionar e a transmissão foi encerrada. Verifique sua conexão com a "
+        "internet e comece de novo."
+    ),
     ErrorCode.UNEXPECTED: (
         "Algo deu errado e a transmissão parou. Tente novamente. Se continuar acontecendo, "
         "reinicie o Peek."
@@ -86,7 +93,7 @@ LINK_TITLE = "Link para assistir"
 COPY_LINK = "Copiar link"
 LINK_COPIED = "Link copiado!"
 SHARE_HINT = "Mande o link para seus amigos no chat do Discord."
-# Temporário: até o link público (Fase 3) ficar pronto.
+# Só no modo de desenvolvimento sem link público (--no-tunnel).
 LOCAL_NETWORK_HINT = (
     "Por enquanto, o link só funciona para quem estiver na mesma rede (Wi-Fi) que você."
 )

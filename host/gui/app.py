@@ -16,7 +16,7 @@ from host.session import StreamSession
 log = logging.getLogger(__name__)
 
 
-def run_gui(*, port: int) -> int:
+def run_gui(*, port: int, public: bool = True) -> int:
     app = QApplication.instance() or QApplication(sys.argv)
     app.setApplicationName(msg.APP_NAME)
 
@@ -25,8 +25,7 @@ def run_gui(*, port: int) -> int:
     closed = asyncio.Event()
     app.aboutToQuit.connect(closed.set)
 
-    # TODO(Fase 3): public=True quando o link público (cloudflared) existir.
-    session = StreamSession(port=port, public=False)
+    session = StreamSession(port=port, public=public)
     window = MainWindow(session)
     window.show()
     log.info("Janela aberta")

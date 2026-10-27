@@ -100,9 +100,6 @@ def _run_headless(args: argparse.Namespace) -> int:
         source.name,
         extra={"source_kind": source.kind, "source_id": source.id},
     )
-    if not args.no_tunnel:
-        # TODO(Fase 3, quarta): cloudflared. Até lá, só rede local.
-        log.warning("O link público ainda não está implementado; usando só a rede local.")
     if not args.no_audio:
         log.info("Áudio ainda não implementado; transmitindo só o vídeo.")
 
@@ -112,16 +109,16 @@ def _run_headless(args: argparse.Namespace) -> int:
         args.quality, resolution=args.resolution, fps=args.fps, bitrate_kbps=args.bitrate
     )
     try:
-        return asyncio.run(_headless_session(source, quality, args.port))
+        return asyncio.run(_headless_session(source, quality, args.port, public=not args.no_tunnel))
     except KeyboardInterrupt:
         return 0
 
 
-async def _headless_session(source, quality, port: int) -> int:
+async def _headless_session(source, quality, port: int, *, public: bool) -> int:
     from host.gui.messages import error_message
     from host.session import SessionError, StreamSession
 
-    session = StreamSession(port=port, public=False)
+    session = StreamSession(port=port, public=public)
     finished = asyncio.Event()
     session.viewers_changed.connect(lambda n: log.info("Pessoas assistindo: %d", n))
     session.error.connect(lambda code: (log.error(error_message(code)), finished.set()))
@@ -141,7 +138,7 @@ async def _headless_session(source, quality, port: int) -> int:
 def _run_gui(args: argparse.Namespace) -> int:
     from host.gui.app import run_gui
 
-    return run_gui(port=args.port)
+    return run_gui(port=args.port, public=not args.no_tunnel)
 
 
 def main(argv: list[str] | None = None) -> int:

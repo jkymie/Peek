@@ -11,6 +11,7 @@ import host.session
 from host.capture.video import CaptureClosed, CapturedFrame, CaptureError, CaptureSource, SourceKind
 from host.rtc.quality import PRESETS
 from host.session import ErrorCode, SessionError, SessionState, StreamSession
+from host.tunnel import TunnelError
 
 SCREEN = CaptureSource(SourceKind.MONITOR, 1, "Tela 1", 64, 48, primary=True)
 WINDOW = CaptureSource(SourceKind.WINDOW, 42, "Filme", 32, 24)
@@ -52,10 +53,44 @@ class FakeCapture:
         self._closed.set()
 
 
-@pytest.fixture
-async def live_session(monkeypatch):
+class FakeTunnel:
+    created: ClassVar[list["FakeTunnel"]] = []
+    fail = False
+
+    def __init__(self) -> None:
+        self.local_url: str | None = None
+        self.stopping = False
+        self._closed = asyncio.Event()
+        FakeTunnel.created.append(self)
+
+    async def start(self, local_url: str) -> str:
+        if FakeTunnel.fail:
+            raise TunnelError("sem internet")
+        self.local_url = local_url
+        return "https://teste.trycloudflare.com"
+
+    async def wait_closed(self) -> None:
+        await self._closed.wait()
+
+    def crash(self) -> None:
+        self._closed.set()
+
+    async def stop(self) -> None:
+        self.stopping = True
+        self._closed.set()
+
+
+@pytest.fixture(autouse=True)
+def fakes(monkeypatch):
     FakeCapture.created = []
+    FakeTunnel.created = []
+    FakeTunnel.fail = False
     monkeypatch.setattr(host.session, "VideoCapture", FakeCapture)
+    monkeypatch.setattr(host.session, "Tunnel", FakeTunnel)
+
+
+@pytest.fixture
+async def live_session():
     session = StreamSession(port=0, public=True)
     errors: list[ErrorCode] = []
     session.error.connect(errors.append)
@@ -124,3 +159,45 @@ async def test_changes_require_live_session():
         await session.set_quality(PRESETS["nitida"])
     with pytest.raises(RuntimeError):
         await session.switch_source(WINDOW)
+
+
+async def test_public_link_comes_from_tunnel(live_session):
+    session, _errors = live_session
+    tunnel = FakeTunnel.created[0]
+
+    assert session.link.startswith("https://teste.trycloudflare.com/s/")
+    assert tunnel.local_url == f"http://127.0.0.1:{session._server.port}"
+
+    await session.stop()
+    assert tunnel.stopping
+    assert session.link is None
+
+
+async def test_tunnel_failure_reports_error_and_cleans_up():
+    FakeTunnel.fail = True
+    session = StreamSession(port=0, public=True)
+    errors: list[ErrorCode] = []
+    session.error.connect(errors.append)
+
+    with pytest.raises(SessionError) as exc:
+        await session.start(SCREEN, PRESETS["equilibrada"])
+
+    assert exc.value.code is ErrorCode.TUNNEL_FAILED
+    assert errors == [ErrorCode.TUNNEL_FAILED]
+    assert session.state is SessionState.IDLE
+    assert FakeCapture.created[0].stopped
+    assert session._server is None
+
+
+async def test_tunnel_crash_ends_session(live_session):
+    session, errors = live_session
+
+    FakeTunnel.created[0].crash()
+    for _ in range(50):
+        if session.state is SessionState.IDLE:
+            break
+        await asyncio.sleep(0.01)
+
+    assert session.state is SessionState.IDLE
+    assert errors == [ErrorCode.TUNNEL_LOST]
+    assert FakeCapture.created[0].stopped
