@@ -223,6 +223,7 @@ __marimo__/
 # Binários gerados/baixados (peek-audio.exe, cloudflared.exe)
 host/bin/*
 !host/bin/.gitkeep
+audio-helper/build/
 # Saídas de ferramentas de desenvolvimento
 snapshots/
 # Dependências da interface React (ui/). As páginas geradas (web/ e host/gui/ui/) são
