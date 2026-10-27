@@ -75,6 +75,9 @@ class StreamSession:
     * ``link_ready(str)``: link para mandar aos amigos
     * ``viewers_changed(int)``
     * ``error(ErrorCode)``: a transmissão parou ou não começou
+
+    Durante a transmissão, :meth:`set_quality` e :meth:`switch_source` mudam o que os
+    espectadores recebem sem desconectar ninguém.
     """
 
     def __init__(self, *, port: int = 8080, public: bool = False) -> None:
@@ -93,6 +96,9 @@ class StreamSession:
         self._server: ViewerServer | None = None
         self._watch_task: asyncio.Task | None = None
         self._link: str | None = None
+        self._source: CaptureSource | None = None
+        self._quality: Quality | None = None
+        self._swap_lock = asyncio.Lock()
 
     @property
     def state(self) -> SessionState:
@@ -101,6 +107,14 @@ class StreamSession:
     @property
     def link(self) -> str | None:
         return self._link
+
+    @property
+    def source(self) -> CaptureSource | None:
+        return self._source
+
+    @property
+    def quality(self) -> Quality | None:
+        return self._quality
 
     @property
     def viewers(self) -> int:
@@ -141,10 +155,67 @@ class StreamSession:
         log.info("Parando transmissão")
         await self._teardown()
 
+    async def set_quality(self, quality: Quality) -> None:
+        """Troca a qualidade durante a transmissão. Em caso de erro, levanta
+        :class:`SessionError` e mantém a qualidade anterior."""
+        self._require_live()
+        log.info("Trocando qualidade", extra={"quality": quality.preset})
+        if quality.fps != self._capture.max_fps:
+            # O limite de FPS da captura é decidido quando ela é criada.
+            await self._swap_capture(self._source, quality.fps)
+            if self._state is not SessionState.LIVE:
+                return
+        apply_bitrate_cap(quality.bitrate_kbps)
+        self._converter.quality = quality
+        self._quality = quality
+
+    async def switch_source(self, source: CaptureSource) -> None:
+        """Passa a mostrar outra tela ou janela. Se ela não funcionar, levanta
+        :class:`SessionError` e continua mostrando a anterior."""
+        self._require_live()
+        log.info("Trocando fonte", extra={"source_kind": source.kind, "source_id": source.id})
+        await self._swap_capture(source, self._quality.fps)
+        if self._state is SessionState.LIVE:
+            self._source = source
+
     # --- internos ---------------------------------------------------------------
+
+    def _require_live(self) -> None:
+        if self._state is not SessionState.LIVE:
+            raise RuntimeError(f"Sessão não está transmitindo (estado: {self._state})")
+
+    async def _swap_capture(self, source: CaptureSource, fps: int) -> None:
+        """Inicia uma captura nova e só troca quando ela já tem imagem."""
+        async with self._swap_lock:
+            capture = VideoCapture(source, max_fps=fps)
+            try:
+                await capture.start()
+            except CaptureError as exc:
+                raise SessionError(ErrorCode.CAPTURE_FAILED, str(exc)) from exc
+            try:
+                await asyncio.wait_for(capture.next_frame(), FIRST_FRAME_TIMEOUT)
+            except (TimeoutError, CaptureError) as exc:
+                await capture.stop()
+                raise SessionError(ErrorCode.NO_FRAMES, str(exc)) from exc
+            if self._state is not SessionState.LIVE or self._converter is None:
+                await capture.stop()  # a transmissão parou enquanto esperávamos
+                return
+
+            old, self._capture = self._capture, capture
+            self._converter.set_provider(capture)
+            watch, self._watch_task = (
+                self._watch_task,
+                asyncio.create_task(self._watch_capture(capture)),
+            )
+            if watch is not None:
+                watch.cancel()
+            if old is not None:
+                await old.stop()
 
     async def _start(self, source: CaptureSource, quality: Quality) -> str:
         apply_bitrate_cap(quality.bitrate_kbps)
+        self._source = source
+        self._quality = quality
 
         self._capture = VideoCapture(source, max_fps=quality.fps)
         try:
@@ -198,6 +269,8 @@ class StreamSession:
             await capture.stop()
         self._converter = None
         self._link = None
+        self._source = None
+        self._quality = None
         self._set_state(SessionState.IDLE)
 
     def _set_state(self, state: SessionState) -> None:

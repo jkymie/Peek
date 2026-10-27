@@ -260,7 +260,8 @@ Fica para depois da 1.0: a Fase 10, a CI completa com testes de interface e os w
 - [ ] `rtc/quality.py`: presets **Econômica, Equilibrada, Nítida, Fluida, Máxima** + **Personalizada**
 - [ ] Redimensionamento sem nunca aumentar além do tamanho original
 - [ ] Limite de envio por espectador (teto de bitrate no encoder/`RTCRtpSender`)
-- [ ] Troca de qualidade **sem renegociar** a conexão (alterar FPS/escala na track e o teto no encoder)
+- [x] Troca de qualidade **sem renegociar** a conexão (alterar FPS/escala na track e o teto no encoder) — `StreamSession.set_quality`; mudar o FPS recria só a captura
+- [x] Trocar a tela/janela durante a transmissão sem desconectar ninguém (`StreamSession.switch_source`); se a nova falhar, continua a anterior
 - [ ] Medição de FPS real e uso de CPU; emitir evento "PC não está dando conta" com sugestão de opção mais leve
 - [ ] Flags `--quality`, `--resolution`, `--fps`, `--bitrate`
 - [ ] Testes unitários dos presets e da regra de "não aumentar resolução"

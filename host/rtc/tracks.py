@@ -50,18 +50,32 @@ class FrameConverter:
         self._provider = provider
         self.quality = quality
         self._lock = asyncio.Lock()
-        self._cache_key: tuple[int, int | None] | None = None
+        self._generation = 0
+        self._cache_key: tuple[int, int, int | None] | None = None
         self._cache: np.ndarray | None = None
+
+    def set_provider(self, provider: FrameProvider) -> None:
+        """Troca a captura (outra tela/janela ou outro FPS) sem mexer nas tracks."""
+        self._provider = provider
+        # A captura nova recomeça o ``seq`` em 1: o cache precisa saber de qual captura é.
+        self._generation += 1
 
     async def latest_yuv(self) -> np.ndarray:
         """Frame mais recente em YUV 4:2:0 (``(altura * 3 / 2, largura)``, ``uint8``)."""
-        frame = self._provider.latest
+        provider = self._provider
+        frame = provider.latest
         if frame is None:
-            frame = await self._provider.next_frame()
+            try:
+                frame = await provider.next_frame()
+            except CaptureClosed:
+                if provider is self._provider:
+                    raise
+                # A captura foi trocada enquanto esperávamos: usa a nova.
+                return await self.latest_yuv()
         async with self._lock:
             # Outro espectador pode ter convertido este mesmo frame enquanto esperávamos.
             frame = self._provider.latest or frame
-            key = (frame.seq, self.quality.height)
+            key = (self._generation, frame.seq, self.quality.height)
             if key != self._cache_key:
                 self._cache = await asyncio.to_thread(self._convert, frame, self.quality.height)
                 self._cache_key = key
