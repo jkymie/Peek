@@ -63,14 +63,16 @@ Se houver uma segunda pessoa, ela pode desenvolver o `audio-helper` (Fase 4) em 
 
 ### Roteiro de teste de quinta
 
-- [ ] Abrir com `python -m host`: nenhuma janela de terminal extra aparece além da usada para iniciar
-- [ ] Transmitir a **tela inteira** e depois **uma janela específica**
-- [ ] Copiar o link e abrir em Chrome, Edge e Firefox, sendo pelo menos um espectador em outra rede
-- [ ] Contador mostra 1, 2 e volta a 1 quando alguém fecha a aba
-- [ ] Testar Econômica e Nítida, anotando a impressão de nitidez, travamentos e uso de CPU
-- [ ] **Parar** derruba os espectadores, e o link antigo deixa de funcionar
-- [ ] Desligar a internet antes de começar e conferir se a mensagem de erro é compreensível
-- [ ] (Se o áudio entrar) tocar um vídeo, falar no Discord e confirmar que os espectadores não ouvem a call
+Ensaio automatizado em 27/10 (sessão real, link público e dois espectadores `aiortc` conectando pelo link): 12 de 12 verificações passaram. Os testes com pessoas foram feitos no mesmo dia; continuam abertos a impressão de qualidade/CPU e a confirmação visual da troca de fonte.
+
+- [x] Abrir com `python -m host`: nenhuma janela de terminal extra aparece além da usada para iniciar — conferido em 27/10
+- [ ] Transmitir a **tela inteira** e depois **uma janela específica** — ensaio: monitor e troca para uma janela funcionaram; falta conferir a imagem no navegador
+- [x] Copiar o link e abrir em Chrome, Edge e Firefox, sendo pelo menos um espectador em outra rede — validado em 27/10 (link pronto em ~9 s)
+- [x] Contador mostra 1, 2 e volta a 1 quando alguém fecha a aba — ensaio em 27/10
+- [ ] Testar Econômica e Nítida, anotando a impressão de nitidez, travamentos e uso de CPU — ensaio: 480p → 1080p sem reconectar; falta a impressão visual e a CPU
+- [x] **Parar** derruba os espectadores, e o link antigo deixa de funcionar — ensaio em 27/10: espectador recebe "terminou", link responde 502, nenhum processo fica para trás
+- [x] Desligar a internet antes de começar e conferir se a mensagem de erro é compreensível — simulado em 27/10 (pedido de link do `cloudflared` sem resposta): em 0,7 s aparece "Não foi possível criar o link. Verifique sua conexão com a internet e tente novamente."; vale repetir com o Wi-Fi desligado de verdade
+- [x] (Se o áudio entrar) tocar um vídeo, falar no Discord e confirmar que os espectadores não ouvem a call — validado em 27/10 com uma call real
 
 ### Riscos específicos do prazo
 
@@ -214,7 +216,7 @@ Fica para depois da 1.0: a Fase 10, a CI completa com testes de interface e os w
 - [x] **Código da sala**: incluir um token aleatório no caminho do link (ex.: `/s/<token>`) e recusar sinalização sem token válido; invalidar ao parar
 - [ ] Endurecer a sinalização: limite de espectadores simultâneos, limite de tamanho de mensagem e de conexões por IP
 - [ ] Garantir que a página do espectador **não expõe nenhum controle** de quem transmite
-- [ ] Testar espectador em outra rede (4G, rede de amigo)
+- [x] Testar espectador em outra rede (4G, rede de amigo) — validado em 27/10
 
 **Pronto quando:** `python -m host --headless` imprime um link que funciona fora da rede local, e o link deixa de funcionar ao parar.
 
@@ -231,7 +233,7 @@ Fica para depois da 1.0: a Fase 10, a CI completa com testes de interface e os w
 - [x] Mensagens de status/erro em `stderr` com formato simples e estável (ex.: `STATUS discord_found pid=...`, `ERROR unsupported_os`) para o Python interpretar
 - [x] Modo fallback quando o Discord não está aberto (loopback do sistema inteiro) — exclui só o próprio helper
 - [x] Verificação de versão do Windows (build ≥ 20348) com código de saída específico
-- [ ] Teste manual: tocar música + falar na call do Discord e confirmar que só a música é capturada — em 27/10 a exclusão foi provada com `--exclude-pid` (um tom de 1 kHz some da captura quando o processo que toca é excluído); falta o teste com uma call de verdade
+- [x] Teste manual: tocar música + falar na call do Discord e confirmar que só a música é capturada — validado em 27/10 com uma call real (antes, a exclusão já tinha sido provada com `--exclude-pid`)
 
 **Pronto quando:** `peek-audio.exe > out.raw` gera um arquivo que, reproduzido, não contém o áudio do Discord.
 
@@ -311,7 +313,7 @@ Fica para depois da 1.0: a Fase 10, a CI completa com testes de interface e os w
 - [ ] Indicador discreto da qualidade atual (ex.: "Nítida")
 - [ ] Estados claros: "Conectando…", "A transmissão terminou", "Não foi possível conectar. Tente outro navegador ou outra rede."
 - [ ] Reconexão automática em quedas curtas
-- [ ] Teste em Chrome, Edge e Firefox (desktop) e verificação básica em celular
+- [ ] Teste em Chrome, Edge e Firefox (desktop) e verificação básica em celular — desktop validado em 27/10; falta o celular
 - [ ] Sem dependências externas de CDN (tudo servido localmente)
 
 **Pronto quando:** um amigo abre o link e assiste sem precisar de instruções além de "clique se não tiver som".
