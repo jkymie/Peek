@@ -225,3 +225,6 @@ host/bin/*
 !host/bin/.gitkeep
 # Saídas de ferramentas de desenvolvimento
 snapshots/
+# Dependências da interface React (ui/). As páginas geradas (web/ e host/gui/ui/) são
+# versionadas, para rodar o Peek sem precisar do Node.
+ui/node_modules/

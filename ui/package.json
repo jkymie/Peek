@@ -1,0 +1,20 @@
+{
+  "name": "peek-ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Interfaces do Peek em React: janela de quem transmite e página de quem assiste.",
+  "scripts": {
+    "dev": "vite --mode broadcaster",
+    "dev:viewer": "vite --mode viewer",
+    "build": "vite build --mode broadcaster && vite build --mode viewer"
+  },
+  "dependencies": {
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "6.1.2",
+    "vite": "8.3.5"
+  }
+}

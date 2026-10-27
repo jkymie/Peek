@@ -100,7 +100,7 @@ Uma opção **Personalizada** fica escondida em "Mais opções" para quem quiser
 ```mermaid
 flowchart LR
     subgraph PC["PC de quem transmite (Windows)"]
-        GUI["Janela do Peek<br/>(PySide6)"] --> APP
+        GUI["Janela do Peek<br/>(PySide6 + React)"] --> APP
         WC["windows-capture<br/>(vídeo da tela/janela)"] --> APP
         AH["peek-audio.exe<br/>(áudio do sistema, sem o Discord)"] -->|PCM via stdout| APP
         APP["Núcleo do Peek (Python)<br/>aiortc + aiohttp"]
@@ -117,13 +117,13 @@ flowchart LR
 
 | Componente | Tecnologia | Função |
 |---|---|---|
-| Interface | [`PySide6`](https://doc.qt.io/qtforpython-6/) | Janela simples para escolher tela, qualidade e copiar o link |
+| Interface | [`PySide6`](https://doc.qt.io/qtforpython-6/) (QtWebEngine) + [React](https://react.dev/) | Janela para escolher tela e qualidade, copiar o link e, durante a transmissão, trocar a qualidade ou a tela |
 | Captura de vídeo | [`windows-capture`](https://pypi.org/project/windows-capture/) (Windows Graphics Capture) | Captura a tela inteira ou uma janela específica |
 | Captura de áudio | `peek-audio.exe` (C++, WASAPI Application Loopback) | Captura o áudio do sistema excluindo a árvore de processos do Discord |
 | WebRTC | [`aiortc`](https://github.com/aiortc/aiortc) + [`PyAV`](https://github.com/PyAV-Org/PyAV) | Codifica e envia vídeo e áudio para cada espectador |
 | Servidor | [`aiohttp`](https://docs.aiohttp.org/) | Serve a página do espectador e faz a sinalização via WebSocket |
 | Link público | [`cloudflared`](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) (incluído no `Peek.exe`) | Cria um link HTTPS sem abrir portas no roteador |
-| Espectador | HTML + JavaScript (WebRTC nativo do navegador) | Recebe e reproduz a transmissão |
+| Espectador | React (WebRTC nativo do navegador) | Recebe e reproduz a transmissão, com volume e tela cheia |
 
 O link público carrega apenas a página e a sinalização. O vídeo e o áudio trafegam diretamente entre o PC de quem transmite e o de cada amigo, usando o STUN público do Google para atravessar o NAT.
 
@@ -194,6 +194,30 @@ O atalho usa o `pythonw.exe` do `.venv`, que não mostra janela de terminal. Os 
 
 No modo `--headless`, o link da transmissão é exibido no terminal.
 
+### Interface (React)
+
+As duas telas (a janela do Peek e a página de quem assiste) são feitas em React, em `ui/`. O resultado do build já fica versionado em `host/gui/ui/` e `web/`, então **o Node só é necessário para mexer na interface**, não para rodar o Peek.
+
+```bash
+cd ui
+npm install
+npm run build        # gera host/gui/ui/ (janela) e web/ (espectador)
+```
+
+Para editar com recarregamento automático:
+
+```powershell
+# Janela do Peek: o Vite serve a interface e o Peek a carrega dele
+cd ui; npm run dev
+$env:PEEK_UI_DEV_URL = "http://localhost:5173/"; python -m host
+
+# Página de quem assiste: rode o Peek em outro terminal e abra o link trocando a porta 8080 por 5173
+python -m host --headless --no-tunnel
+cd ui; npm run dev:viewer
+```
+
+A janela não tem textos próprios: todos vêm de `host/gui/messages.py` pela ponte (`host/gui/bridge.py`). Depois de mudar algo em `ui/`, rode `npm run build` e faça commit das pastas geradas junto.
+
 ### Opções de linha de comando
 
 Estas opções existem só para desenvolvimento e testes. Tudo o que elas fazem também precisa estar disponível pela interface gráfica.
@@ -241,8 +265,10 @@ peek/
 ├── host/                  # App de quem transmite (Python)
 │   ├── __main__.py        # Ponto de entrada (interface ou --headless)
 │   ├── gui/
-│   │   ├── main_window.py # Janela principal: escolher tela, qualidade, copiar link
-│   │   └── messages.py    # Textos e mensagens de erro em linguagem simples
+│   │   ├── main_window.py # Janela: navegador embutido (QtWebEngine) com a interface React
+│   │   ├── bridge.py      # Ponte Python ↔ React (estado da tela e cliques)
+│   │   ├── messages.py    # Textos e mensagens de erro em linguagem simples
+│   │   └── ui/            # Interface da janela (gerada por `npm run build`)
 │   ├── server.py          # aiohttp: página do espectador + sinalização WebSocket
 │   ├── tunnel.py          # Inicia e monitora o cloudflared, obtém o link público
 │   ├── capture/
@@ -257,10 +283,12 @@ peek/
 ├── audio-helper/          # Captura de áudio com exclusão do Discord (C++)
 │   ├── CMakeLists.txt
 │   └── src/main.cpp
-├── web/                   # Página do espectador
-│   ├── index.html
-│   ├── viewer.js
-│   └── style.css
+├── ui/                    # Código-fonte das interfaces em React (Vite)
+│   └── src/
+│       ├── broadcaster/   # Janela de quem transmite
+│       ├── viewer/        # Página de quem assiste
+│       └── shared/        # Cores e ícones comuns
+├── web/                   # Página do espectador (gerada por `npm run build`)
 ├── peek.spec              # Configuração do PyInstaller
 ├── requirements.txt
 └── README.md

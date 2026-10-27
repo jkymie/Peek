@@ -1,0 +1,45 @@
+/* Cores e medidas comuns às duas telas do Peek. */
+
+:root {
+  --bg: #111214;
+  --surface: #1a1b1e;
+  --surface-2: #232428;
+  --surface-hover: #2b2d31;
+  --border: #2e3035;
+  --fg: #f2f3f5;
+  --muted: #a0a4ad;
+  --accent: #5865f2;
+  --accent-hover: #4752c4;
+  --accent-soft: rgb(88 101 242 / 16%);
+  --live: #ed4245;
+  --success: #3ba55c;
+  --danger-soft: rgb(237 66 69 / 14%);
+  --radius: 10px;
+  --radius-sm: 6px;
+  --focus: 0 0 0 3px rgb(88 101 242 / 55%);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 15px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Roboto,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button { font: inherit; color: inherit; }
+
+:focus-visible { outline: none; box-shadow: var(--focus); }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

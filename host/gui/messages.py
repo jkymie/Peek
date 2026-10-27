@@ -2,6 +2,13 @@
 
 Regra do projeto: nada de termos técnicos ("bitrate", "WebRTC", "tunnel", "porta"...).
 Toda mensagem de erro diz o que fazer.
+
+Pela regra 5 do README, ao lado do nome da qualidade aparecem a resolução e o FPS
+("1080p · 30 fps"), gerados por :func:`quality_details`. O nome do dia a dia continua
+sendo o principal; números de envio ("kbps") nunca aparecem.
+
+A interface da janela (React, em ``ui/``) recebe estes textos prontos por
+:func:`ui_texts`; ela não tem textos próprios.
 """
 
 from __future__ import annotations
@@ -44,6 +51,12 @@ def error_message(code: ErrorCode) -> str:
     return ERRORS.get(code, ERRORS[ErrorCode.UNEXPECTED])
 
 
+def quality_details(height: int | None, fps: int) -> str:
+    """Resolução e FPS ao lado do nome da qualidade, ex.: "1080p · 30 fps"."""
+    resolution = f"{height}p" if height else "Original"
+    return f"{resolution} · {fps} fps"
+
+
 # --- Janela principal ----------------------------------------------------------
 
 APP_NAME = "Peek"
@@ -55,6 +68,8 @@ SCREEN_ITEM = "Tela inteira"
 SCREEN_ITEM_NUMBERED = "Tela inteira {n}"
 SCREEN_PRIMARY = "principal"
 WINDOW_MINIMIZED = "minimizada"
+SCREENS_GROUP = "Telas"
+WINDOWS_GROUP = "Janelas"
 FULL_SCREEN_REMINDER = (
     "Lembrete: tudo o que aparecer na tela, incluindo notificações, será visto por quem "
     "estiver assistindo."
@@ -65,7 +80,9 @@ START = "Começar a transmitir"
 PREPARING = "Preparando a transmissão…"
 
 LIVE_TITLE = "Você está transmitindo!"
+LIVE_BADGE = "Ao vivo"
 LIVE_SOURCE = "Mostrando: {name}"
+LINK_TITLE = "Link para assistir"
 COPY_LINK = "Copiar link"
 LINK_COPIED = "Link copiado!"
 SHARE_HINT = "Mande o link para seus amigos no chat do Discord."
@@ -74,6 +91,20 @@ LOCAL_NETWORK_HINT = (
     "Por enquanto, o link só funciona para quem estiver na mesma rede (Wi-Fi) que você."
 )
 STOP = "Parar"
+
+QUALITY_LIVE_HINT = "A troca vale na hora para quem está assistindo."
+QUALITY_CHANGED = "Qualidade trocada para {name}."
+QUALITY_FAILED = "Não foi possível trocar a qualidade. A transmissão continua como estava."
+
+SWITCH_SOURCE = "Trocar tela"
+SWITCH_TITLE = "O que você quer mostrar agora?"
+SWITCH_CONFIRM = "Mostrar esta"
+SWITCHING = "Trocando…"
+CANCEL = "Cancelar"
+SOURCE_SWITCHED = "Agora você está mostrando: {name}"
+SWITCH_FAILED = (
+    "Não foi possível mostrar o que você escolheu. A transmissão continua mostrando {name}."
+)
 
 ERROR_TITLE = "Ops, algo não deu certo"
 TRY_AGAIN = "Tentar novamente"
@@ -90,3 +121,12 @@ def viewers_text(count: int) -> str:
     if count == 1:
         return "1 pessoa assistindo"
     return f"{count} pessoas assistindo"
+
+
+def ui_texts() -> dict[str, str]:
+    """Todos os textos simples deste módulo, para a interface da janela."""
+    return {
+        name: value
+        for name, value in globals().items()
+        if name.isupper() and isinstance(value, str)
+    }

@@ -306,7 +306,7 @@ Fica para depois da 1.0: a Fase 10, a CI completa com testes de interface e os w
 
 **Objetivo:** experiência de quem assiste tão simples quanto a de quem transmite.
 
-- [ ] Layout limpo, tela cheia com um clique/duplo clique, controle de volume
+- [x] Layout limpo, sem rolagem, tela cheia (botão, duplo clique ou tecla F), controle de volume (lembra o último volume) — em React, 26/10
 - [ ] Aviso **"Clique para ativar o som"** quando o navegador bloquear o autoplay
 - [ ] Indicador discreto da qualidade atual (ex.: "Nítida")
 - [ ] Estados claros: "Conectando…", "A transmissão terminou", "Não foi possível conectar. Tente outro navegador ou outra rede."

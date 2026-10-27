@@ -1,62 +1,14 @@
-:root {
-  --bg: #0e0f12;
-  --fg: #f2f3f5;
-  --muted: #a8acb5;
-  --accent: #5865f2;
-  color-scheme: dark;
-}
-
-* { box-sizing: border-box; }
+/* Página "Este link não está mais ativo" (gerada pelo host/server.py, fora do React). */
 
 html, body {
   margin: 0;
   height: 100%;
-  background: var(--bg);
-  color: var(--fg);
-  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  overflow: hidden;
+  background: #111214;
+  color: #f2f3f5;
+  font: 16px/1.5 "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  color-scheme: dark;
 }
-
-#stage {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  display: grid;
-  place-items: center;
-}
-
-video {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  background: #000;
-}
-
-.status {
-  position: absolute;
-  margin: 0;
-  padding: 12px 20px;
-  border-radius: 8px;
-  background: rgb(0 0 0 / 70%);
-  text-align: center;
-  max-width: calc(100% - 32px);
-}
-
-.status[hidden] { display: none; }
-
-.unmute {
-  position: absolute;
-  bottom: 24px;
-  padding: 12px 20px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--accent);
-  color: #fff;
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.unmute:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
 
 .message {
   display: grid;
@@ -66,4 +18,4 @@ video {
   text-align: center;
 }
 
-.message p:last-child { color: var(--muted); }
+.message p:last-child { color: #a0a4ad; }

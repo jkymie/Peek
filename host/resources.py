@@ -13,4 +13,10 @@ def resource_root() -> Path:
 
 
 def web_dir() -> Path:
+    """Página de quem assiste (gerada a partir de ``ui/src/viewer``)."""
     return resource_root() / "web"
+
+
+def window_ui_dir() -> Path:
+    """Interface da janela do Peek (gerada a partir de ``ui/src/broadcaster``)."""
+    return resource_root() / "host" / "gui" / "ui"
