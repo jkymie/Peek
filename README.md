@@ -138,7 +138,7 @@ Esta seção é para quem vai trabalhar no código. **Quem só quer transmitir n
 - Windows 11 (a API *Application Loopback* é documentada pela Microsoft a partir do Windows 10 build 20348)
 - Python 3.11 ou superior
 - [`cloudflared`](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/) no `PATH` (para desenvolvimento; no `Peek.exe` ele vai embutido)
-- Visual Studio 2022 (ou Build Tools) com *Desenvolvimento para desktop com C++*, para compilar o `peek-audio.exe`
+- Um compilador C++ e o [CMake](https://cmake.org/), para compilar o `peek-audio.exe`: Visual Studio 2022 (ou Build Tools) com *Desenvolvimento para desktop com C++*, ou [llvm-mingw](https://github.com/mstorsjo/llvm-mingw), que não precisa de administrador (`scoop install cmake ninja mingw-mstorsjo-llvm-ucrt`)
 
 ### Instalação
 
@@ -167,12 +167,19 @@ Os logs ficam em `%LOCALAPPDATA%\Peek\logs\peek.log` (uma linha JSON por evento)
 
 ### Compilando o helper de áudio
 
+O executável vai direto para `host/bin/`, onde o Peek o procura.
+
 ```bash
-cd audio-helper
-cmake -B build -G "Visual Studio 17 2022"
-cmake --build build --config Release
-copy build\Release\peek-audio.exe ..\host\bin\
+# Com Visual Studio
+cmake -S audio-helper -B audio-helper/build -G "Visual Studio 17 2022"
+cmake --build audio-helper/build --config Release
+
+# Com llvm-mingw
+cmake -S audio-helper -B audio-helper/build -G Ninja -DCMAKE_CXX_COMPILER=clang++
+cmake --build audio-helper/build
 ```
+
+Sem o `peek-audio.exe`, o Peek transmite só a imagem e avisa na janela.
 
 ### Rodando em modo de desenvolvimento
 
@@ -256,7 +263,9 @@ O `peek-audio.exe` escreve áudio bruto no `stdout` para o núcleo Python ler:
 - Taxa de amostragem: 48 000 Hz
 - Canais: 2 (estéreo)
 
-O helper localiza o `Discord.exe` raiz (o processo cujo pai não é outro `Discord.exe`) e usa o modo `PROCESS_LOOPBACK_MODE_EXCLUDE_TARGET_PROCESS_TREE`, que remove o Discord e todos os seus subprocessos da captura. Se o Discord for aberto depois do início da transmissão, o Peek deve detectar isso e reiniciar a captura de áudio automaticamente, sem intervenção de quem transmite.
+O helper só escreve enquanto algo toca; o Peek completa com silêncio. No `stderr`, uma linha por evento: `STATUS discord_found pid=<n>`, `STATUS discord_not_found`, `STATUS capturing` ou `ERROR <código> [detalhes]` (ex.: `ERROR unsupported_os build=19045`). Códigos de saída: `0` (o Peek fechou a leitura), `2` (Windows incompatível), `3` (falha ao iniciar), `4` (falha durante a captura).
+
+O helper localiza o `Discord.exe` raiz (o processo cujo pai não é outro `Discord.exe`; também `DiscordPTB.exe` e `DiscordCanary.exe`) e usa o modo `PROCESS_LOOPBACK_MODE_EXCLUDE_TARGET_PROCESS_TREE`, que remove o Discord e todos os seus subprocessos da captura. Sem o Discord aberto (ou com `--include-discord`), ele exclui só a si mesmo, o que equivale a capturar o sistema inteiro. Se o Discord for aberto depois do início da transmissão, o Peek deve detectar isso e reiniciar a captura de áudio automaticamente, sem intervenção de quem transmite.
 
 ### Estrutura do projeto
 
@@ -321,10 +330,10 @@ peek/
 
 **Base técnica**
 
-- [ ] Captura de vídeo + `aiortc` + página do espectador funcionando localmente
-- [ ] Link público via `cloudflared`
-- [ ] `peek-audio.exe` com exclusão do Discord
-- [ ] Integração do áudio com o núcleo Python
+- [x] Captura de vídeo + `aiortc` + página do espectador funcionando localmente
+- [x] Link público via `cloudflared`
+- [x] `peek-audio.exe` com exclusão do Discord
+- [x] Integração do áudio com o núcleo Python
 - [ ] Opções de qualidade com troca em tempo real
 
 **Experiência simples para quem transmite (obrigatório para a versão 1.0)**

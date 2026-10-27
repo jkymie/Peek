@@ -45,7 +45,7 @@ Alguém da equipe abre o Peek (`python -m host`), escolhe uma tela ou janela **p
 | Janela PySide6 mínima: lista de fontes, qualidade (3 presets: Econômica, Equilibrada, Nítida), **Começar**, **Copiar link**, contador, **Parar**, erro genérico em linguagem simples (Fase 7, versão mínima) | Telas de erro específicas, tema escuro, lembrar configurações |
 | Página do espectador básica com o aviso "Clique para ativar o som" (Fase 8, versão mínima) | Reconexão automática, indicador de qualidade |
 | Modo `--headless` para depurar | `Peek.exe` (Fase 9) |
-| **Meta extra:** `peek-audio.exe` com exclusão do Discord (Fases 4 e 5) | Detecção do Discord aberto depois |
+| **Meta extra:** `peek-audio.exe` com exclusão do Discord (Fases 4 e 5) — feito em 27/10 | Detecção do Discord aberto depois |
 
 > **Áudio:** é o item de maior risco do prazo (C++ e WASAPI). Se não ficar estável até quarta à noite, a versão de quinta sai **só com vídeo**, e o pessoal continua ouvindo pela call do Discord. Não vale usar a captura do sistema inteiro como plano B, porque isso devolve a voz da call para os amigos (o eco que o Peek existe para evitar).
 
@@ -142,7 +142,7 @@ Fica para depois da 1.0: a Fase 10, a CI completa com testes de interface e os w
 
 **Objetivo:** ter um repositório organizado, reprodutível e com verificações automáticas desde o primeiro commit de código.
 
-- [ ] Criar a estrutura de pastas do README (`host/`, `audio-helper/`, `web/`) — `host/` criado em 26/10; `web/` e `audio-helper/` entram junto com o código deles
+- [x] Criar a estrutura de pastas do README (`host/`, `audio-helper/`, `web/`)
 - [x] `requirements.txt` com versões fixadas (`PySide6`, `windows-capture`, `aiortc`, `av`, `aiohttp`, `qasync`) e `requirements-dev.txt` (`pytest`, `pytest-asyncio`, `ruff`, `pyinstaller`)
 - [x] Configurar `ruff` (lint/format) e `pytest`
 - [ ] CI no GitHub Actions em `windows-latest`: lint + testes Python + compilação do `audio-helper`
@@ -224,14 +224,14 @@ Fica para depois da 1.0: a Fase 10, a CI completa com testes de interface e os w
 
 **Objetivo:** capturar todo o áudio do sistema exceto o Discord. Componente independente, pode começar cedo.
 
-- [ ] Projeto CMake em `audio-helper/`
-- [ ] Localizar o `Discord.exe` raiz (pai não é outro `Discord.exe`); considerar também variantes (`DiscordPTB.exe`, `DiscordCanary.exe`)
-- [ ] `ActivateAudioInterfaceAsync` com `PROCESS_LOOPBACK_MODE_EXCLUDE_TARGET_PROCESS_TREE`
-- [ ] Saída PCM float32 LE, 48 kHz, estéreo no `stdout`, conforme o protocolo do README
-- [ ] Mensagens de status/erro em `stderr` com formato simples e estável (ex.: `STATUS discord_found pid=...`, `ERROR unsupported_os`) para o Python interpretar
-- [ ] Modo fallback quando o Discord não está aberto (loopback do sistema inteiro)
-- [ ] Verificação de versão do Windows (build ≥ 20348) com código de saída específico
-- [ ] Teste manual: tocar música + falar na call do Discord e confirmar que só a música é capturada
+- [x] Projeto CMake em `audio-helper/` — compila com MSVC ou llvm-mingw (27/10: llvm-mingw, que não tem o `audioclientactivationparams.h`; as estruturas estão declaradas no `main.cpp`)
+- [x] Localizar o `Discord.exe` raiz (pai não é outro `Discord.exe`); considerar também variantes (`DiscordPTB.exe`, `DiscordCanary.exe`)
+- [x] `ActivateAudioInterfaceAsync` com `PROCESS_LOOPBACK_MODE_EXCLUDE_TARGET_PROCESS_TREE`
+- [x] Saída PCM float32 LE, 48 kHz, estéreo no `stdout`, conforme o protocolo do README
+- [x] Mensagens de status/erro em `stderr` com formato simples e estável (ex.: `STATUS discord_found pid=...`, `ERROR unsupported_os`) para o Python interpretar
+- [x] Modo fallback quando o Discord não está aberto (loopback do sistema inteiro) — exclui só o próprio helper
+- [x] Verificação de versão do Windows (build ≥ 20348) com código de saída específico
+- [ ] Teste manual: tocar música + falar na call do Discord e confirmar que só a música é capturada — em 27/10 a exclusão foi provada com `--exclude-pid` (um tom de 1 kHz some da captura quando o processo que toca é excluído); falta o teste com uma call de verdade
 
 **Pronto quando:** `peek-audio.exe > out.raw` gera um arquivo que, reproduzido, não contém o áudio do Discord.
 
@@ -241,13 +241,13 @@ Fica para depois da 1.0: a Fase 10, a CI completa com testes de interface e os w
 
 **Objetivo:** levar o áudio do helper até os espectadores, sincronizado com o vídeo e sem intervenção manual.
 
-- [ ] `capture/audio.py`: iniciar o `peek-audio.exe` sem console, ler o `stdout` de forma assíncrona e montar frames para o `aiortc`
-- [ ] `AudioStreamTrack` em `rtc/tracks.py` (Opus via `aiortc`)
+- [x] `capture/audio.py`: iniciar o `peek-audio.exe` sem console, ler o `stdout` de forma assíncrona e montar frames para o `aiortc`
+- [x] `AudioStreamTrack` em `rtc/tracks.py` (Opus via `aiortc`) — `SystemAudioTrack`; em 27/10 um tom de 1 kHz chegou a um espectador `aiortc` com o mesmo volume
 - [ ] Ajuste de sincronia áudio/vídeo (timestamps coerentes)
 - [ ] **Detecção do Discord aberto depois**: monitorar processos e reiniciar o helper automaticamente, sem derrubar os espectadores
 - [ ] Reiniciar o helper se ele cair, com limite de tentativas e mensagem amigável
-- [ ] Opções `--no-audio` e `--include-discord`
-- [ ] Expor na `StreamSession` o estado do som (ativo, sem som, erro)
+- [x] Opções `--no-audio` e `--include-discord`
+- [x] Expor na `StreamSession` o estado do som (ativo, sem som, erro) — `sound_changed(SoundState)`; se o som falhar, a transmissão segue só com imagem e a janela avisa
 
 **Pronto quando:** espectadores ouvem o jogo/vídeo, não ouvem a call, e abrir o Discord no meio da transmissão não exige nenhuma ação.
 
