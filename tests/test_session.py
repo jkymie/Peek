@@ -8,9 +8,10 @@ import numpy as np
 import pytest
 
 import host.session
+from host.capture.audio import AudioError
 from host.capture.video import CaptureClosed, CapturedFrame, CaptureError, CaptureSource, SourceKind
 from host.rtc.quality import PRESETS
-from host.session import ErrorCode, SessionError, SessionState, StreamSession
+from host.session import ErrorCode, SessionError, SessionState, SoundState, StreamSession
 from host.tunnel import TunnelError
 
 SCREEN = CaptureSource(SourceKind.MONITOR, 1, "Tela 1", 64, 48, primary=True)
@@ -80,13 +81,48 @@ class FakeTunnel:
         self._closed.set()
 
 
+class FakeAudio:
+    created: ClassVar[list["FakeAudio"]] = []
+    fail = False
+
+    def __init__(self, *, include_discord: bool = False) -> None:
+        self.include_discord = include_discord
+        self.stopping = False
+        self.error = None
+        self._closed = asyncio.Event()
+        FakeAudio.created.append(self)
+
+    async def start(self) -> None:
+        if FakeAudio.fail:
+            raise AudioError("unsupported_os")
+
+    def subscribe(self):
+        return None
+
+    def unsubscribe(self, buffer) -> None:
+        pass
+
+    async def wait_closed(self) -> None:
+        await self._closed.wait()
+
+    def crash(self) -> None:
+        self._closed.set()
+
+    async def stop(self) -> None:
+        self.stopping = True
+        self._closed.set()
+
+
 @pytest.fixture(autouse=True)
 def fakes(monkeypatch):
     FakeCapture.created = []
     FakeTunnel.created = []
     FakeTunnel.fail = False
+    FakeAudio.created = []
+    FakeAudio.fail = False
     monkeypatch.setattr(host.session, "VideoCapture", FakeCapture)
     monkeypatch.setattr(host.session, "Tunnel", FakeTunnel)
+    monkeypatch.setattr(host.session, "AudioCapture", FakeAudio)
 
 
 @pytest.fixture
@@ -201,3 +237,53 @@ async def test_tunnel_crash_ends_session(live_session):
     assert session.state is SessionState.IDLE
     assert errors == [ErrorCode.TUNNEL_LOST]
     assert FakeCapture.created[0].stopped
+
+
+async def test_sound_starts_with_session_and_stops_with_it(live_session):
+    session, _errors = live_session
+    audio = FakeAudio.created[0]
+    kinds = [track.kind for track in session._make_tracks()]
+
+    assert kinds == ["video", "audio"]
+    await session.stop()
+    assert audio.stopping
+
+
+async def test_sound_failure_keeps_streaming_video():
+    FakeAudio.fail = True
+    session = StreamSession(port=0, public=True)
+    sounds: list[SoundState] = []
+    session.sound_changed.connect(sounds.append)
+
+    await session.start(SCREEN, PRESETS["equilibrada"])
+    try:
+        assert session.state is SessionState.LIVE
+        assert sounds == [SoundState.FAILED]
+        assert [t.kind for t in session._make_tracks()] == ["video"]
+    finally:
+        await session.stop()
+
+
+async def test_sound_crash_is_reported_without_stopping(live_session):
+    session, errors = live_session
+    sounds: list[SoundState] = []
+    session.sound_changed.connect(sounds.append)
+
+    FakeAudio.created[0].crash()
+    await asyncio.sleep(0.05)
+
+    assert sounds == [SoundState.FAILED]
+    assert session.state is SessionState.LIVE
+    assert not errors
+
+
+async def test_sound_off_skips_helper():
+    session = StreamSession(port=0, public=True, sound=False)
+    sounds: list[SoundState] = []
+    session.sound_changed.connect(sounds.append)
+    await session.start(SCREEN, PRESETS["equilibrada"])
+    try:
+        assert sounds == [SoundState.OFF]
+        assert not FakeAudio.created
+    finally:
+        await session.stop()

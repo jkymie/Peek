@@ -22,6 +22,7 @@ class FakeSession:
         self.state_changed = Signal("state_changed")
         self.link_ready = Signal("link_ready")
         self.viewers_changed = Signal("viewers_changed")
+        self.sound_changed = Signal("sound_changed")
         self.error = Signal("error")
         self.state = SessionState.IDLE
         self.public = True

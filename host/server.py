@@ -73,7 +73,7 @@ class ViewerServer:
         self,
         *,
         token: str,
-        make_track: Callable[[], MediaStreamTrack],
+        make_tracks: Callable[[], list[MediaStreamTrack]],
         on_viewers_changed: Callable[[int], None],
         web_dir: Path,
         host: str,
@@ -82,7 +82,7 @@ class ViewerServer:
         ice_servers: tuple[str, ...] = STUN_SERVERS,
     ) -> None:
         self._token = token
-        self._make_track = make_track
+        self._make_tracks = make_tracks
         self._on_viewers_changed = on_viewers_changed
         self._web_dir = web_dir
         self._host = host
@@ -195,7 +195,8 @@ class ViewerServer:
 
         try:
             await pc.setRemoteDescription(RTCSessionDescription(sdp=sdp, type="offer"))
-            pc.addTrack(self._make_track())
+            for track in self._make_tracks():
+                pc.addTrack(track)
             await pc.setLocalDescription(await pc.createAnswer())
         except Exception:
             log.exception("Oferta inválida", extra={"viewer": viewer.id})

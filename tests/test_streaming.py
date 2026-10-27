@@ -50,7 +50,7 @@ async def stream():
     counts: list[int] = []
     server = ViewerServer(
         token=TOKEN,
-        make_track=lambda: ScreenTrack(converter),
+        make_tracks=lambda: [ScreenTrack(converter)],
         on_viewers_changed=counts.append,
         web_dir=web_dir(),
         host="127.0.0.1",

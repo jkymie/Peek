@@ -15,10 +15,11 @@ from collections.abc import Callable
 from enum import StrEnum
 from typing import Any
 
+from host.capture.audio import AudioCapture, AudioError
 from host.capture.video import CaptureError, CaptureSource, VideoCapture
 from host.resources import web_dir
 from host.rtc.quality import Quality, apply_bitrate_cap
-from host.rtc.tracks import FrameConverter, ScreenTrack
+from host.rtc.tracks import FrameConverter, ScreenTrack, SystemAudioTrack
 from host.server import ViewerServer, lan_ip
 from host.tunnel import Tunnel, TunnelError
 
@@ -32,6 +33,12 @@ class SessionState(StrEnum):
     PREPARING = "preparing"
     LIVE = "live"
     STOPPING = "stopping"
+
+
+class SoundState(StrEnum):
+    ON = "on"  # espectadores ouvem o som do PC (sem o Discord)
+    OFF = "off"  # som desligado por quem transmite
+    FAILED = "failed"  # não deu para capturar; a transmissão segue só com imagem
 
 
 class ErrorCode(StrEnum):
@@ -77,25 +84,39 @@ class StreamSession:
     * ``state_changed(SessionState)``
     * ``link_ready(str)``: link para mandar aos amigos
     * ``viewers_changed(int)``
+    * ``sound_changed(SoundState)``: emitido ao começar e se o som cair; não para a
+      transmissão
     * ``error(ErrorCode)``: a transmissão parou ou não começou
 
     Durante a transmissão, :meth:`set_quality` e :meth:`switch_source` mudam o que os
     espectadores recebem sem desconectar ninguém.
     """
 
-    def __init__(self, *, port: int = 8080, public: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        port: int = 8080,
+        public: bool = False,
+        sound: bool = True,
+        include_discord: bool = False,
+    ) -> None:
         self.port = port
         # public=True: servidor só em 127.0.0.1, exposto pelo cloudflared.
         # public=False: servidor na rede local, para testes com --no-tunnel.
         self.public = public
+        self.sound = sound
+        self.include_discord = include_discord
         self.state_changed = Signal("state_changed")
         self.link_ready = Signal("link_ready")
         self.viewers_changed = Signal("viewers_changed")
+        self.sound_changed = Signal("sound_changed")
         self.error = Signal("error")
 
         self._state = SessionState.IDLE
         self._capture: VideoCapture | None = None
         self._converter: FrameConverter | None = None
+        self._audio: AudioCapture | None = None
+        self._audio_watch_task: asyncio.Task | None = None
         self._server: ViewerServer | None = None
         self._tunnel: Tunnel | None = None
         self._watch_task: asyncio.Task | None = None
@@ -234,10 +255,11 @@ class StreamSession:
             raise SessionError(ErrorCode.NO_FRAMES, str(exc)) from exc
 
         self._converter = FrameConverter(self._capture, quality)
+        await self._start_sound()
         token = secrets.token_urlsafe(16)
         self._server = ViewerServer(
             token=token,
-            make_track=lambda: ScreenTrack(self._converter),
+            make_tracks=self._make_tracks,
             on_viewers_changed=self.viewers_changed.emit,
             web_dir=web_dir(),
             host="127.0.0.1" if self.public else "0.0.0.0",
@@ -261,6 +283,35 @@ class StreamSession:
         self._watch_task = asyncio.create_task(self._watch_capture(self._capture))
         return base + self._server.viewer_path()
 
+    async def _start_sound(self) -> None:
+        if not self.sound:
+            self.sound_changed.emit(SoundState.OFF)
+            return
+        audio = AudioCapture(include_discord=self.include_discord)
+        try:
+            await audio.start()
+        except AudioError as exc:
+            log.warning("Sem som nesta transmissão", extra={"code": exc.code, "detail": exc.detail})
+            self.sound_changed.emit(SoundState.FAILED)
+            return
+        self._audio = audio
+        self._audio_watch_task = asyncio.create_task(self._watch_sound(audio))
+        self.sound_changed.emit(SoundState.ON)
+
+    def _make_tracks(self) -> list:
+        tracks = [ScreenTrack(self._converter)]
+        if self._audio is not None:
+            tracks.append(SystemAudioTrack(self._audio))
+        return tracks
+
+    async def _watch_sound(self, audio: AudioCapture) -> None:
+        await audio.wait_closed()
+        if audio.stopping or self._state not in (SessionState.PREPARING, SessionState.LIVE):
+            return
+        # Quem já assiste continua recebendo a track, agora só com silêncio.
+        log.warning("O som parou", extra={"code": audio.error.code if audio.error else None})
+        self.sound_changed.emit(SoundState.FAILED)
+
     async def _watch_capture(self, capture: VideoCapture) -> None:
         await capture.wait_closed()
         if capture.stopping or self._state is not SessionState.LIVE:
@@ -279,7 +330,7 @@ class StreamSession:
 
     async def _teardown(self) -> None:
         self._set_state(SessionState.STOPPING)
-        for name in ("_watch_task", "_tunnel_watch_task"):
+        for name in ("_watch_task", "_tunnel_watch_task", "_audio_watch_task"):
             watch = getattr(self, name)
             setattr(self, name, None)
             if watch is not None and watch is not asyncio.current_task():
@@ -292,6 +343,9 @@ class StreamSession:
         tunnel, self._tunnel = self._tunnel, None
         if tunnel is not None:
             await tunnel.stop()
+        audio, self._audio = self._audio, None
+        if audio is not None:
+            await audio.stop()
         capture, self._capture = self._capture, None
         if capture is not None:
             await capture.stop()

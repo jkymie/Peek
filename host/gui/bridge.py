@@ -29,7 +29,7 @@ from PySide6.QtGui import QGuiApplication
 from host.capture.video import CaptureSource, SourceKind, list_sources
 from host.gui import messages as msg
 from host.rtc.quality import DEFAULT_PRESET, PRESETS, resolve_quality
-from host.session import ErrorCode, SessionError, StreamSession
+from host.session import ErrorCode, SessionError, SoundState, StreamSession
 
 log = logging.getLogger(__name__)
 
@@ -125,6 +125,7 @@ class Bridge(QObject):
 
         session.link_ready.connect(self._on_link_ready)
         session.viewers_changed.connect(self._on_viewers_changed)
+        session.sound_changed.connect(self._on_sound_changed)
         session.error.connect(self._on_error)
 
         self.refresh_sources(emit=False)
@@ -273,6 +274,11 @@ class Bridge(QObject):
     def _on_viewers_changed(self, count: int) -> None:
         self.viewers = count
         self.emit_state()
+
+    def _on_sound_changed(self, state: SoundState) -> None:
+        if state is SoundState.FAILED:
+            self._notify(msg.SOUND_FAILED, error=True)
+            self.emit_state()
 
     def _on_error(self, code: ErrorCode) -> None:
         if self.closing:

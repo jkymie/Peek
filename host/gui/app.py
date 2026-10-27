@@ -16,7 +16,9 @@ from host.session import StreamSession
 log = logging.getLogger(__name__)
 
 
-def run_gui(*, port: int, public: bool = True) -> int:
+def run_gui(
+    *, port: int, public: bool = True, sound: bool = True, include_discord: bool = False
+) -> int:
     app = QApplication.instance() or QApplication(sys.argv)
     app.setApplicationName(msg.APP_NAME)
 
@@ -25,7 +27,7 @@ def run_gui(*, port: int, public: bool = True) -> int:
     closed = asyncio.Event()
     app.aboutToQuit.connect(closed.set)
 
-    session = StreamSession(port=port, public=public)
+    session = StreamSession(port=port, public=public, sound=sound, include_discord=include_discord)
     window = MainWindow(session)
     window.show()
     log.info("Janela aberta")

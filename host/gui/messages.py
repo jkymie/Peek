@@ -99,6 +99,11 @@ LOCAL_NETWORK_HINT = (
 )
 STOP = "Parar"
 
+SOUND_FAILED = (
+    "Não foi possível incluir o som. Seus amigos veem a imagem, mas não ouvem nada. "
+    "Para tentar de novo, pare e comece a transmissão outra vez."
+)
+
 QUALITY_LIVE_HINT = "A troca vale na hora para quem está assistindo."
 QUALITY_CHANGED = "Qualidade trocada para {name}."
 QUALITY_FAILED = "Não foi possível trocar a qualidade. A transmissão continua como estava."

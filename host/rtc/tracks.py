@@ -7,6 +7,9 @@ envio) é feita uma vez só e compartilhada por :class:`FrameConverter`.
 O Windows só entrega frames quando a imagem muda, então a track não espera um
 frame novo: ela segue o FPS pedido e reenvia o último frame quando a tela está
 parada.
+
+O som segue a mesma ideia: :class:`SystemAudioTrack` manda 20 ms por vez, no ritmo
+do relógio, e completa com silêncio quando não há nada tocando.
 """
 
 from __future__ import annotations
@@ -22,6 +25,7 @@ import numpy as np
 from aiortc import MediaStreamTrack
 from aiortc.mediastreams import MediaStreamError
 
+from host.capture.audio import CHANNELS, SAMPLE_RATE, AudioCapture
 from host.capture.video import CaptureClosed, CapturedFrame
 from host.rtc.quality import Quality, scaled_size
 
@@ -29,6 +33,8 @@ log = logging.getLogger(__name__)
 
 VIDEO_CLOCK_RATE = 90_000
 VIDEO_TIME_BASE = fractions.Fraction(1, VIDEO_CLOCK_RATE)
+AUDIO_TIME_BASE = fractions.Fraction(1, SAMPLE_RATE)
+AUDIO_FRAME_SAMPLES = SAMPLE_RATE // 50  # 20 ms, o tamanho de pacote do Opus
 # Se a track atrasar mais que isso (PC sobrecarregado), recomeça a agenda em vez de
 # mandar uma rajada de frames para "alcançar" o tempo perdido.
 MAX_LAG_SECONDS = 0.5
@@ -127,3 +133,47 @@ class ScreenTrack(MediaStreamTrack):
             await asyncio.sleep(wait)
         elif wait < -MAX_LAG_SECONDS:
             self._start = now - self._timestamp / VIDEO_CLOCK_RATE
+
+
+class SystemAudioTrack(MediaStreamTrack):
+    """Track de som de um espectador: o áudio do sistema, sem o Discord."""
+
+    kind = "audio"
+
+    def __init__(self, capture: AudioCapture) -> None:
+        super().__init__()
+        self._capture = capture
+        self._buffer = capture.subscribe()
+        self._start: float | None = None
+        self._timestamp = 0
+
+    async def recv(self) -> av.AudioFrame:
+        if self.readyState != "live":
+            raise MediaStreamError
+        await self._wait_next_slot()
+        samples = self._buffer.pull(AUDIO_FRAME_SAMPLES)
+        if samples is None:
+            pcm = np.zeros((1, AUDIO_FRAME_SAMPLES * CHANNELS), dtype=np.int16)
+        else:
+            pcm = (np.clip(samples, -1.0, 1.0) * 32767).astype(np.int16).reshape(1, -1)
+        frame = av.AudioFrame.from_ndarray(pcm, format="s16", layout="stereo")
+        frame.sample_rate = SAMPLE_RATE
+        frame.pts = self._timestamp
+        frame.time_base = AUDIO_TIME_BASE
+        return frame
+
+    def stop(self) -> None:
+        self._capture.unsubscribe(self._buffer)
+        super().stop()
+
+    async def _wait_next_slot(self) -> None:
+        now = time.monotonic()
+        if self._start is None:
+            self._start = now
+            return
+        self._timestamp += AUDIO_FRAME_SAMPLES
+        wait = self._start + self._timestamp / SAMPLE_RATE - now
+        if wait > 0:
+            await asyncio.sleep(wait)
+        elif wait < -MAX_LAG_SECONDS:
+            self._start = now - self._timestamp / SAMPLE_RATE

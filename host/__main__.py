@@ -100,25 +100,28 @@ def _run_headless(args: argparse.Namespace) -> int:
         source.name,
         extra={"source_kind": source.kind, "source_id": source.id},
     )
-    if not args.no_audio:
-        log.info("Áudio ainda não implementado; transmitindo só o vídeo.")
-
     from host.rtc.quality import resolve_quality
 
     quality = resolve_quality(
         args.quality, resolution=args.resolution, fps=args.fps, bitrate_kbps=args.bitrate
     )
     try:
-        return asyncio.run(_headless_session(source, quality, args.port, public=not args.no_tunnel))
+        return asyncio.run(_headless_session(source, quality, args))
     except KeyboardInterrupt:
         return 0
 
 
-async def _headless_session(source, quality, port: int, *, public: bool) -> int:
+async def _headless_session(source, quality, args: argparse.Namespace) -> int:
     from host.gui.messages import error_message
     from host.session import SessionError, StreamSession
 
-    session = StreamSession(port=port, public=public)
+    session = StreamSession(
+        port=args.port,
+        public=not args.no_tunnel,
+        sound=not args.no_audio,
+        include_discord=args.include_discord,
+    )
+    session.sound_changed.connect(lambda state: log.info("Som: %s", state))
     finished = asyncio.Event()
     session.viewers_changed.connect(lambda n: log.info("Pessoas assistindo: %d", n))
     session.error.connect(lambda code: (log.error(error_message(code)), finished.set()))
@@ -138,7 +141,12 @@ async def _headless_session(source, quality, port: int, *, public: bool) -> int:
 def _run_gui(args: argparse.Namespace) -> int:
     from host.gui.app import run_gui
 
-    return run_gui(port=args.port, public=not args.no_tunnel)
+    return run_gui(
+        port=args.port,
+        public=not args.no_tunnel,
+        sound=not args.no_audio,
+        include_discord=args.include_discord,
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
