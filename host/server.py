@@ -106,6 +106,20 @@ class ViewerServer:
     def viewer_path(self) -> str:
         return f"/s/{self._token}"
 
+    def set_bitrate(self, bitrate_kbps: int) -> None:
+        """Leva a nova qualidade a quem já está assistindo, sem esperar o navegador pedir.
+
+        O codificador de cada espectador é criado pelo aiortc e não é exposto; depende de
+        detalhe interno (revisar ao atualizar a versão fixada).
+        """
+        for viewer in self._viewers:
+            if viewer.pc is None:
+                continue
+            for sender in viewer.pc.getSenders():
+                encoder = getattr(sender, "_RTCRtpSender__encoder", None)
+                if encoder is not None and hasattr(encoder, "target_bitrate"):
+                    encoder.target_bitrate = bitrate_kbps * 1000
+
     async def start(self) -> None:
         app = web.Application(middlewares=[_security_headers])
         app.router.add_get("/s/{token}", self._handle_page)

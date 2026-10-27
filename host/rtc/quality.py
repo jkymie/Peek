@@ -61,11 +61,20 @@ def scaled_size(width: int, height: int, target_height: int | None) -> tuple[int
 
 
 def apply_bitrate_cap(bitrate_kbps: int) -> None:
-    """Ajusta o teto de bitrate dos codificadores do aiortc.
+    """Ajusta o teto e o valor inicial de bitrate dos codificadores do aiortc.
 
     O aiortc limita o VP8 a 1,5 Mbps e o H.264 a 3 Mbps por constantes de módulo,
     lidas a cada ajuste de bitrate. Sem isso, "Nítida" e "Máxima" ficariam presas
-    nesses tetos. Vale para todos os espectadores (todos usam a mesma qualidade).
+    nesses tetos.
+
+    Ele também começa cada espectador em 500 kbps (VP8) e só sobe conforme o navegador
+    avisa que tem banda, cerca de 8% por segundo. Medido com o Chrome em 26/10: na
+    "Nítida" (1080p), depois de 25 s ainda eram ~1,2 Mbps dos 5 Mbps, e a imagem ficava
+    borrada. Começando no valor da qualidade, chega a ~5 Mbps em 4 s; se a internet de
+    quem assiste não aguentar, o navegador continua pedindo para baixar.
+
+    Vale para todos os espectadores (todos usam a mesma qualidade). Quem já está
+    assistindo é ajustado por ``ViewerServer.set_bitrate``.
 
     Depende de detalhe interno do aiortc: revisar ao atualizar a versão fixada.
     """
@@ -73,3 +82,4 @@ def apply_bitrate_cap(bitrate_kbps: int) -> None:
     for codec in (vpx, h264):
         codec.MAX_BITRATE = bitrate
         codec.MIN_BITRATE = min(codec.MIN_BITRATE, bitrate)
+        codec.DEFAULT_BITRATE = bitrate

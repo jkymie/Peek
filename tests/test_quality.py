@@ -26,10 +26,11 @@ def test_scaled_size(size, target, expected):
 
 @pytest.fixture
 def restore_codec_limits():
-    saved = [(c, c.MAX_BITRATE, c.MIN_BITRATE) for c in (vpx, h264)]
+    saved = [(c, c.MAX_BITRATE, c.MIN_BITRATE, c.DEFAULT_BITRATE) for c in (vpx, h264)]
     yield
-    for codec, max_bitrate, min_bitrate in saved:
+    for codec, max_bitrate, min_bitrate, default_bitrate in saved:
         codec.MAX_BITRATE, codec.MIN_BITRATE = max_bitrate, min_bitrate
+        codec.DEFAULT_BITRATE = default_bitrate
 
 
 @pytest.mark.usefixtures("restore_codec_limits")
@@ -42,3 +43,11 @@ def test_bitrate_cap_reaches_aiortc_encoders():
     apply_bitrate_cap(200)  # abaixo do mínimo padrão do aiortc
     encoder.target_bitrate = 50_000_000
     assert encoder.target_bitrate == 200_000
+
+
+@pytest.mark.usefixtures("restore_codec_limits")
+def test_new_viewers_start_at_the_chosen_quality():
+    # Sem isso, o aiortc começa em 500 kbps e leva quase um minuto para chegar na "Nítida".
+    apply_bitrate_cap(PRESETS["nitida"].bitrate_kbps)
+    assert vpx.Vp8Encoder().target_bitrate == 5_000_000
+    assert h264.H264Encoder().target_bitrate == 5_000_000

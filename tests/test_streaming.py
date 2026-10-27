@@ -7,10 +7,11 @@ import aiohttp
 import numpy as np
 import pytest
 from aiortc import RTCPeerConnection, RTCSessionDescription
+from aiortc.codecs import h264, vpx
 
 from host.capture.video import CaptureClosed, CapturedFrame
 from host.resources import web_dir
-from host.rtc.quality import PRESETS, resolve_quality
+from host.rtc.quality import PRESETS, apply_bitrate_cap, resolve_quality
 from host.rtc.tracks import FrameConverter, ScreenTrack
 from host.server import ViewerServer
 
@@ -102,6 +103,30 @@ async def test_viewer_receives_scaled_video_and_is_counted(stream):
         await ws.close()
         await _wait_for(lambda: server.viewer_count == 0)
         assert counts[-1] == 0
+
+
+async def test_quality_change_reaches_viewers_already_watching(stream):
+    server, _counts, _provider = stream
+    saved = [(c, c.MAX_BITRATE, c.MIN_BITRATE, c.DEFAULT_BITRATE) for c in (vpx, h264)]
+    try:
+        apply_bitrate_cap(PRESETS["economica"].bitrate_kbps)
+        async with aiohttp.ClientSession() as http:
+            ws, pc, track = await _connect_viewer(http, server.port)
+            await asyncio.wait_for(track.recv(), 15)
+            (sender,) = next(iter(server._viewers)).pc.getSenders()
+            encoder = sender._RTCRtpSender__encoder
+            assert encoder.target_bitrate == 1_500_000
+
+            # Troca para "Nítida": quem já assiste sobe na hora, sem esperar o navegador.
+            apply_bitrate_cap(PRESETS["nitida"].bitrate_kbps)
+            server.set_bitrate(PRESETS["nitida"].bitrate_kbps)
+            assert encoder.target_bitrate == 5_000_000
+            await pc.close()
+            await ws.close()
+    finally:
+        for codec, max_bitrate, min_bitrate, default_bitrate in saved:
+            codec.MAX_BITRATE, codec.MIN_BITRATE = max_bitrate, min_bitrate
+            codec.DEFAULT_BITRATE = default_bitrate
 
 
 async def test_static_screen_still_produces_frames_at_target_fps(stream):

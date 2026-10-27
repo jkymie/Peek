@@ -166,6 +166,7 @@ class StreamSession:
             if self._state is not SessionState.LIVE:
                 return
         apply_bitrate_cap(quality.bitrate_kbps)
+        self._server.set_bitrate(quality.bitrate_kbps)
         self._converter.quality = quality
         self._quality = quality
 
