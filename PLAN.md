@@ -106,7 +106,7 @@ Cenário alternativo ao Marco 1, partindo do princípio de que daria tempo de fa
 | **Seg 26/10, noite** | Começar o `peek-audio.exe`: achar o Discord e gravar o som em um arquivo `.raw` | 4 (início) |
 | **Ter 27/10, manhã** | `StreamSession`, modo `--headless` e `cloudflared` com token no link. Transmissão vista de outra rede | 1, 3 |
 | **Ter 27/10, tarde** | Terminar o helper de áudio e ligá-lo ao núcleo, com o som sincronizado ao vídeo | 4, 5 |
-| **Ter 27/10, noite** | **Teste de empacotamento**: gerar o `.exe` do que já existe e abrir em outra máquina | 9 (antecipada) |
+| **Ter 27/10, noite** | **Teste de empacotamento**: gerar o `.exe` do que já existe e abrir em outra máquina — `.exe` gerado e testado no PC de desenvolvimento em 27/10; falta outra máquina | 9 (antecipada) |
 | **Qua 28/10, manhã** | Opções de qualidade, troca durante a transmissão sem reconectar ninguém e medição de FPS/CPU | 6 |
 | **Qua 28/10, tarde e noite** | Janela completa: miniaturas, todos os estados, contador, aviso de tela inteira. Página do espectador final | 7, 8 |
 | **Qui 29/10, manhã** | Casos de borda: Discord aberto depois, reinício do `cloudflared`, mensagens de erro específicas, aviso de Windows incompatível, reconexão de quem assiste | 3, 5, 7, 8 |
@@ -326,9 +326,9 @@ Fica para depois da 1.0: a Fase 10, a CI completa com testes de interface e os w
 
 **Empacotamento**
 
-- [ ] `peek.spec` do PyInstaller: arquivo único, modo janela (sem console), embutindo `peek-audio.exe`, `cloudflared.exe` e `web/`
-- [ ] Resolução de caminhos de recursos que funcione tanto em desenvolvimento quanto no `.exe`
-- [ ] Metadados do executável (versão, ícone, nome do produto)
+- [x] `peek.spec` do PyInstaller: arquivo único, modo janela (sem console), embutindo `peek-audio.exe`, `cloudflared.exe` e `web/` — feito em 27/10 (antecipado): ~250 MB, abre em ~14 s; no próprio PC, transmissão completa pelo `.exe` (link, vídeo, som sem o Discord, Parar, nenhum processo sobrando)
+- [x] Resolução de caminhos de recursos que funcione tanto em desenvolvimento quanto no `.exe`
+- [ ] Metadados do executável (versão, ícone, nome do produto) — versão e nome feitos; falta o ícone
 - [ ] Pipeline de release no GitHub Actions: build do helper + build do `.exe` + publicação nas Releases com checksum SHA-256
 - [ ] Verificar o `.exe` em uma máquina Windows 11 limpa (sem Python, sem Visual Studio)
 

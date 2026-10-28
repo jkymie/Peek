@@ -247,13 +247,14 @@ Estas opções existem só para desenvolvimento e testes. Tudo o que elas fazem 
 
 ### Gerando o `Peek.exe`
 
-O executável final é gerado com [PyInstaller](https://pyinstaller.org/) em modo de janela (sem terminal) e arquivo único, embutindo o `peek-audio.exe`, o `cloudflared.exe` e a página do espectador:
+O executável final é gerado com [PyInstaller](https://pyinstaller.org/) em modo de janela (sem terminal) e arquivo único, embutindo o `peek-audio.exe`, o `cloudflared.exe`, a interface da janela e a página do espectador. Antes, `host\bin` precisa ter os dois executáveis: o `peek-audio.exe` (veja [Compilando o helper de áudio](#compilando-o-helper-de-áudio)) e o `cloudflared.exe` ([download](https://github.com/cloudflare/cloudflared/releases), arquivo `cloudflared-windows-amd64.exe` renomeado):
 
 ```bash
-pyinstaller peek.spec
+copy %USERPROFILE%\scoop\apps\cloudflared\current\cloudflared.exe host\bin\   # se instalado pelo Scoop
+pyinstaller --noconfirm peek.spec
 ```
 
-O resultado fica em `dist\Peek.exe` e é o arquivo publicado nas Releases. O `cloudflared` é distribuído sob a licença Apache 2.0; mantenha o aviso de licença dele junto ao projeto.
+O resultado fica em `dist\Peek.exe` (~250 MB; a maior parte é o navegador embutido do Qt) e é o arquivo publicado nas Releases. A cada abertura o executável se descompacta numa pasta temporária, por isso a janela leva alguns segundos para aparecer (~14 s medidos). Para ficar menor, o `peek.spec` deixa de fora as ferramentas de desenvolvedor do navegador embutido e troca o OpenCV (que o `windows-capture` importa, mas o Peek não usa) por um módulo vazio em `packaging/stubs/`. O `cloudflared` é distribuído sob a licença Apache 2.0; mantenha o aviso de licença dele junto ao projeto.
 
 ### Protocolo do helper de áudio
 
@@ -299,6 +300,7 @@ peek/
 │       └── shared/        # Cores e ícones comuns
 ├── web/                   # Página do espectador (gerada por `npm run build`)
 ├── peek.spec              # Configuração do PyInstaller
+├── packaging/stubs/       # Módulos vazios que substituem dependências não usadas no .exe
 ├── requirements.txt
 └── README.md
 ```
