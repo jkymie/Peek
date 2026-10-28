@@ -66,3 +66,12 @@ async def test_react_interface_loads_and_starts(qtbot):
     assert source == MONITOR
     assert quality.preset == "equilibrada"
     await _wait_until(lambda: _page_shows(window, msg.SWITCH_SOURCE), timeout=5)
+
+
+def test_closing_without_stream_signals_closed(qtbot):
+    # run_gui encerra com este sinal (o Qt não sai sozinho ao fechar a última janela).
+    window = MainWindow(FakeSession(), sources_provider=lambda: [MONITOR])
+    qtbot.addWidget(window)
+    window.show()
+    with qtbot.waitSignal(window.closed, timeout=2000):
+        window.close()

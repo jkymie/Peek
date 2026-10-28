@@ -15,7 +15,7 @@ import logging
 import os
 from collections.abc import Callable
 
-from PySide6.QtCore import Qt, QUrl
+from PySide6.QtCore import Qt, QUrl, Signal
 from PySide6.QtGui import QCloseEvent, QColor
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -40,6 +40,8 @@ def ui_url() -> QUrl:
 
 
 class MainWindow(QWidget):
+    closed = Signal()  # a janela fechou de vez (depois de parar a transmissão, se havia)
+
     def __init__(
         self,
         session: StreamSession,
@@ -71,6 +73,7 @@ class MainWindow(QWidget):
     def closeEvent(self, event: QCloseEvent) -> None:
         if self.bridge.closing or self._session.state is SessionState.IDLE:
             event.accept()
+            self.closed.emit()
             return
         answer = QMessageBox(self)
         answer.setIcon(QMessageBox.Icon.Question)

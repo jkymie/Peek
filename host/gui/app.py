@@ -21,14 +21,18 @@ def run_gui(
 ) -> int:
     app = QApplication.instance() or QApplication(sys.argv)
     app.setApplicationName(msg.APP_NAME)
+    # Quem encerra é o fim de run_until_complete. Se o Qt saísse sozinho ao fechar a
+    # última janela, pararia o loop antes da espera terminar ("Event loop stopped
+    # before Future completed").
+    app.setQuitOnLastWindowClosed(False)
 
     loop = qasync.QEventLoop(app)
     asyncio.set_event_loop(loop)
     closed = asyncio.Event()
-    app.aboutToQuit.connect(closed.set)
 
     session = StreamSession(port=port, public=public, sound=sound, include_discord=include_discord)
     window = MainWindow(session)
+    window.closed.connect(closed.set)
     window.show()
     log.info("Janela aberta")
 
