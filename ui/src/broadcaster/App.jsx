@@ -291,8 +291,17 @@ function SwitchDialog({ state, peek, texts, onClose }) {
 // --- Erro -----------------------------------------------------------------------
 
 function ErrorScreen({ state, peek, texts }) {
+  const [showDetails, setShowDetails] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) return undefined;
+    const timer = setTimeout(() => setCopied(false), LINK_COPIED_MS);
+    return () => clearTimeout(timer);
+  }, [copied]);
+
   return (
-    <main className="screen center">
+    <main className="screen center error-screen">
       <span className="error-icon">
         <AlertIcon size={40} />
       </span>
@@ -301,6 +310,38 @@ function ErrorScreen({ state, peek, texts }) {
       <button type="button" className="button primary large" onClick={() => peek.backToChoose()}>
         {texts.TRY_AGAIN}
       </button>
+      {state.errorDetails && (
+        <button
+          type="button"
+          className="button ghost"
+          aria-expanded={showDetails}
+          onClick={() => setShowDetails((v) => !v)}
+        >
+          {showDetails ? texts.ERROR_DETAILS_HIDE : texts.ERROR_DETAILS_SHOW}
+        </button>
+      )}
+      {showDetails && (
+        <section className="error-details">
+          <p className="error-details-hint">{texts.ERROR_DETAILS_HINT}</p>
+          <pre className="error-log">{state.errorDetails}</pre>
+          <div className="error-details-actions">
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => {
+                peek.copyErrorDetails();
+                setCopied(true);
+              }}
+            >
+              {copied ? <CheckIcon size={16} /> : <CopyIcon size={16} />}
+              {copied ? texts.DETAILS_COPIED : texts.COPY_DETAILS}
+            </button>
+            <button type="button" className="button ghost" onClick={() => peek.openLogFolder()}>
+              {texts.OPEN_LOG_FOLDER}
+            </button>
+          </div>
+        </section>
+      )}
     </main>
   );
 }

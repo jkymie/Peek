@@ -120,6 +120,13 @@ SWITCH_FAILED = (
 
 ERROR_TITLE = "Ops, algo não deu certo"
 TRY_AGAIN = "Tentar novamente"
+# "Ver detalhes" é a única parte técnica da janela: fica escondida e serve para pedir ajuda.
+ERROR_DETAILS_SHOW = "Ver detalhes do erro"
+ERROR_DETAILS_HIDE = "Esconder detalhes"
+ERROR_DETAILS_HINT = "Se precisar de ajuda, copie estes detalhes e mande para quem cuida do Peek."
+COPY_DETAILS = "Copiar detalhes"
+DETAILS_COPIED = "Copiado!"
+OPEN_LOG_FOLDER = "Abrir pasta de registros"
 
 CLOSE_CONFIRM_TITLE = "Parar a transmissão?"
 CLOSE_CONFIRM_TEXT = "Se você fechar o Peek, quem está assistindo vai parar de ver a sua tela."

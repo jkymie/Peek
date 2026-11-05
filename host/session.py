@@ -11,6 +11,7 @@ import asyncio
 import contextlib
 import logging
 import secrets
+import traceback
 from collections.abc import Callable
 from enum import StrEnum
 from typing import Any
@@ -86,7 +87,8 @@ class StreamSession:
     * ``viewers_changed(int)``
     * ``sound_changed(SoundState)``: emitido ao começar e se o som cair; não para a
       transmissão
-    * ``error(ErrorCode)``: a transmissão parou ou não começou
+    * ``error(ErrorCode)``: a transmissão parou ou não começou. Antes de emitir,
+      :attr:`last_error` recebe o detalhe técnico (para o "Ver detalhes" da tela de erro)
 
     Durante a transmissão, :meth:`set_quality` e :meth:`switch_source` mudam o que os
     espectadores recebem sem desconectar ninguém.
@@ -125,6 +127,7 @@ class StreamSession:
         self._source: CaptureSource | None = None
         self._quality: Quality | None = None
         self._swap_lock = asyncio.Lock()
+        self.last_error = ""  # detalhe técnico do último `error` emitido
 
     @property
     def state(self) -> SessionState:
@@ -161,12 +164,12 @@ class StreamSession:
         except SessionError as exc:
             log.error("Falha ao iniciar", extra={"code": exc.code, "detail": exc.detail})
             await self._teardown()
-            self.error.emit(exc.code)
+            self._emit_error(exc.code, _describe(exc))
             raise
         except Exception as exc:
             log.exception("Erro inesperado ao iniciar")
             await self._teardown()
-            self.error.emit(ErrorCode.UNEXPECTED)
+            self._emit_error(ErrorCode.UNEXPECTED, _describe(exc))
             raise SessionError(ErrorCode.UNEXPECTED, str(exc)) from exc
 
         self._link = link
@@ -318,7 +321,7 @@ class StreamSession:
             return
         log.warning("A fonte transmitida sumiu")
         await self._teardown()
-        self.error.emit(ErrorCode.SOURCE_CLOSED)
+        self._emit_error(ErrorCode.SOURCE_CLOSED, f"A captura de {capture.source} terminou.")
 
     async def _watch_tunnel(self, tunnel: Tunnel) -> None:
         await tunnel.wait_closed()
@@ -326,7 +329,7 @@ class StreamSession:
             return
         log.warning("O link público caiu")
         await self._teardown()
-        self.error.emit(ErrorCode.TUNNEL_LOST)
+        self._emit_error(ErrorCode.TUNNEL_LOST, "O processo do link público (cloudflared) parou.")
 
     async def _teardown(self) -> None:
         self._set_state(SessionState.STOPPING)
@@ -355,7 +358,16 @@ class StreamSession:
         self._quality = None
         self._set_state(SessionState.IDLE)
 
+    def _emit_error(self, code: ErrorCode, detail: str) -> None:
+        self.last_error = detail
+        self.error.emit(code)
+
     def _set_state(self, state: SessionState) -> None:
         if state is not self._state:
             self._state = state
             self.state_changed.emit(state)
+
+
+def _describe(exc: BaseException) -> str:
+    """Erro com o traceback completo (inclui a causa original, ``raise ... from``)."""
+    return "".join(traceback.format_exception(exc)).strip()

@@ -144,3 +144,48 @@ async def test_video_capture_delivers_frames():
     finally:
         await capture.stop()
     assert not capture.running
+
+
+def test_capture_options_fall_back_to_simpler_settings():
+    from host.capture.video import _capture_options
+
+    assert _capture_options(30) == [
+        {"cursor_capture": True, "minimum_update_interval": 16},
+        {"cursor_capture": True},
+        {"cursor_capture": None},
+    ]
+    assert _capture_options(None) == [{"cursor_capture": True}, {"cursor_capture": None}]
+
+
+def test_start_capture_retries_when_start_fails(monkeypatch):
+    import sys
+    import types
+
+    from host.capture import video
+
+    attempts = []
+
+    class FakeWindowsCapture:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+        def event(self, handler):
+            return handler
+
+        def start_free_threaded(self):
+            attempts.append(self.kwargs)
+            if "minimum_update_interval" in self.kwargs:
+                raise RuntimeError("Setting a minimum update interval is not supported")
+            return "control"
+
+    monkeypatch.setitem(
+        sys.modules, "windows_capture", types.SimpleNamespace(WindowsCapture=FakeWindowsCapture)
+    )
+    source = CaptureSource(SourceKind.MONITOR, 1, "Tela 1")
+    assert video._start_capture(source, 30, lambda f, c: None, lambda: None) == "control"
+    assert len(attempts) == 2
+    assert "minimum_update_interval" not in attempts[1]
+
+    FakeWindowsCapture.start_free_threaded = lambda self: (_ for _ in ()).throw(OSError("boom"))
+    with pytest.raises(video.CaptureError, match="boom"):
+        video._start_capture(source, 30, lambda f, c: None, lambda: None)

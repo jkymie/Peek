@@ -330,8 +330,30 @@ def find_window(title: str) -> CaptureSource | None:
 # --------------------------------------------------------------------------- #
 
 
-def _create_capture(source: CaptureSource, max_fps: int | None):
-    """Cria o objeto do ``windows-capture``. Importado aqui para a listagem não depender dele."""
+def _capture_options(max_fps: int | None) -> list[dict]:
+    """Configurações tentadas em ordem, da mais completa para a mais simples.
+
+    Pede ao Windows o dobro do FPS: os frames só chegam na grade de atualização do monitor,
+    então um intervalo exato de 1/FPS faria perder frames. O ritmo final é do _FrameThrottle.
+
+    ``minimum_update_interval`` só existe em builds mais novos do Windows 11 e ligar/desligar
+    o cursor exige o Windows 10 2004+. O ``windows-capture`` só confere isso ao *iniciar*
+    (``start_free_threaded``), não ao criar o objeto; por isso cada tentativa cria e inicia.
+    """
+    interval_ms = max(1, 500 // max_fps) if max_fps else None
+    options = []
+    if interval_ms is not None:
+        options.append({"cursor_capture": True, "minimum_update_interval": interval_ms})
+    options.append({"cursor_capture": True})
+    options.append({"cursor_capture": None})  # padrão do Windows para o cursor
+    return options
+
+
+def _start_capture(source: CaptureSource, max_fps: int | None, on_frame, on_closed):
+    """Cria e inicia a captura do ``windows-capture``; devolve o ``CaptureControl``.
+
+    Importado aqui para a listagem não depender dele.
+    """
     from windows_capture import WindowsCapture
 
     target = (
@@ -339,21 +361,26 @@ def _create_capture(source: CaptureSource, max_fps: int | None):
         if source.kind is SourceKind.MONITOR
         else {"window_hwnd": source.id}
     )
-    # Pede ao Windows o dobro do FPS: os frames só chegam na grade de atualização do monitor,
-    # então um intervalo exato de 1/FPS faria perder frames. O ritmo final é do _FrameThrottle.
-    interval_ms = max(1, 500 // max_fps) if max_fps else None
-    try:
-        return WindowsCapture(cursor_capture=True, minimum_update_interval=interval_ms, **target)
-    except Exception as exc:
-        if interval_ms is None:
-            raise CaptureError(f"Não foi possível preparar a captura de {source}: {exc}") from exc
-        # MinUpdateInterval só existe em builds mais novos do Windows 11; sem ele, o limite
-        # de FPS fica só no lado Python.
-        log.info("Captura sem minimum_update_interval", extra={"reason": str(exc)})
+    errors: list[str] = []
+    for options in _capture_options(max_fps):
         try:
-            return WindowsCapture(cursor_capture=True, **target)
-        except Exception as exc2:
-            raise CaptureError(f"Não foi possível preparar a captura de {source}: {exc2}") from exc2
+            capture = WindowsCapture(**options, **target)
+            capture.event(on_frame)
+            capture.event(on_closed)
+            control = capture.start_free_threaded()
+        except Exception as exc:
+            errors.append(f"{options}: {type(exc).__name__}: {exc}")
+            log.warning(
+                "Captura não iniciou com estas opções",
+                extra={"options": options, "reason": str(exc)},
+            )
+            continue
+        if errors:
+            log.info("Captura iniciada com opções reduzidas", extra={"options": options})
+        return control
+    raise CaptureError(
+        f"Não foi possível iniciar a captura de {source}. Tentativas:\n" + "\n".join(errors)
+    )
 
 
 class _FrameThrottle:
@@ -433,15 +460,9 @@ class VideoCapture:
         self._loop = asyncio.get_running_loop()
         self._waiter = self._loop.create_future()
 
-        capture = _create_capture(self.source, self.max_fps)
-        capture.event(self._make_frame_handler())
-        capture.event(self._make_closed_handler())
-        try:
-            self._control = capture.start_free_threaded()
-        except Exception as exc:
-            raise CaptureError(
-                f"Não foi possível iniciar a captura de {self.source}: {exc}"
-            ) from exc
+        self._control = _start_capture(
+            self.source, self.max_fps, self._make_frame_handler(), self._make_closed_handler()
+        )
         log.info(
             "Captura iniciada",
             extra={
@@ -528,23 +549,16 @@ def grab_frame(source: CaptureSource, timeout: float = 5.0) -> CapturedFrame:
     result: list[np.ndarray] = []
     done = threading.Event()
 
-    capture = _create_capture(source, max_fps=None)
-
-    @capture.event
     def on_frame_arrived(frame, control) -> None:
         if not result:
             result.append(np.ascontiguousarray(frame.frame_buffer).copy())
             done.set()
         control.stop()
 
-    @capture.event
     def on_closed() -> None:
         done.set()
 
-    try:
-        control = capture.start_free_threaded()
-    except Exception as exc:
-        raise CaptureError(f"Não foi possível iniciar a captura de {source}: {exc}") from exc
+    control = _start_capture(source, None, on_frame_arrived, on_closed)
     try:
         if not done.wait(timeout):
             # Janelas minimizadas, por exemplo, não produzem frames.

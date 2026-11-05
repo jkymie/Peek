@@ -10,7 +10,8 @@ Telas (campo ``screen`` do estado):
 1. ``choose``: o que mostrar + qualidade + "Começar a transmitir"
 2. ``preparing``
 3. ``live``: link, contador, troca de qualidade, "Trocar tela" e "Parar"
-4. ``error``: frase clara + "Tentar novamente"
+4. ``error``: frase clara + "Tentar novamente" + "Ver detalhes do erro" (texto técnico
+   para copiar e mandar a quem cuida do Peek, e atalho para a pasta de registros)
 """
 
 from __future__ import annotations
@@ -20,14 +21,17 @@ import contextlib
 import itertools
 import json
 import logging
+import platform
 from collections.abc import Callable
 from typing import Any
 
-from PySide6.QtCore import QObject, Signal, Slot
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtCore import QObject, QUrl, Signal, Slot
+from PySide6.QtGui import QDesktopServices, QGuiApplication
 
+from host import __version__
 from host.capture.video import CaptureSource, SourceKind, list_sources
 from host.gui import messages as msg
+from host.logs import current_log_path
 from host.rtc.quality import DEFAULT_PRESET, PRESETS, resolve_quality
 from host.session import ErrorCode, SessionError, SoundState, StreamSession
 
@@ -118,6 +122,7 @@ class Bridge(QObject):
         self.link = ""
         self.viewers = 0
         self.error = ""
+        self.error_details = ""  # texto técnico do "Ver detalhes do erro"
         self.busy: str | None = None  # "quality" ou "source" enquanto a troca acontece
         self.notice: dict[str, Any] | None = None
         self.live_source: CaptureSource | None = None
@@ -148,6 +153,7 @@ class Bridge(QObject):
             "viewers": self.viewers,
             "viewersText": msg.viewers_text(self.viewers),
             "error": self.error,
+            "errorDetails": self.error_details,
             "busy": self.busy,
             "notice": self.notice,
             "texts": msg.ui_texts(),
@@ -190,9 +196,18 @@ class Bridge(QObject):
         QGuiApplication.clipboard().setText(self.link)
 
     @Slot()
+    def copyErrorDetails(self) -> None:
+        QGuiApplication.clipboard().setText(self.error_details)
+
+    @Slot()
+    def openLogFolder(self) -> None:
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(current_log_path().parent)))
+
+    @Slot()
     def backToChoose(self) -> None:
         self.screen = "choose"
         self.error = ""
+        self.error_details = ""
         self.refresh_sources()
 
     # --- ações ---------------------------------------------------------------------
@@ -284,11 +299,28 @@ class Bridge(QObject):
         if self.closing:
             return
         self.error = msg.error_message(code)
+        self.error_details = self._error_report(code)
         self.screen = "error"
         self.busy = None
         self.emit_state()
 
     # --- auxiliares ----------------------------------------------------------------
+
+    def _error_report(self, code: ErrorCode) -> str:
+        source = self.live_source
+        lines = [
+            f"Peek {__version__} · Windows {platform.version()} ({platform.machine()})",
+            f"Erro: {code}",
+        ]
+        if source is not None:
+            size = f", {source.width}x{source.height}" if source.width else ""
+            lines.append(f"Fonte: {source.kind} {source.id}{size}")
+        lines.append(f"Qualidade: {self.live_quality}")
+        detail = getattr(self._session, "last_error", "")
+        if detail:
+            lines += ["", detail]
+        lines += ["", f"Registro completo: {current_log_path()}"]
+        return "\n".join(lines)
 
     def _find_source(self, key: str) -> CaptureSource | None:
         return next((s for s in self._sources if source_key(s) == key), None)

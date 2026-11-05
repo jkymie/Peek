@@ -49,6 +49,14 @@ def default_log_dir() -> Path:
     return Path(base) / "Peek" / "logs"
 
 
+def current_log_path() -> Path:
+    """Arquivo de log em uso (o do handler configurado em :func:`setup_logging`)."""
+    for handler in logging.getLogger().handlers:
+        if isinstance(handler, logging.FileHandler):
+            return Path(handler.baseFilename)
+    return default_log_dir() / LOG_FILE_NAME
+
+
 def setup_logging(
     *, console: bool = False, debug: bool = False, log_dir: Path | None = None
 ) -> Path:

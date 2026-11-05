@@ -243,3 +243,17 @@ def test_window_texts_have_no_technical_terms():
     texts += [t for pair in msg.QUALITY_LABELS.values() for t in pair]
     offenders = [t for t in texts if FORBIDDEN_TERMS.search(t)]
     assert not offenders
+
+
+async def test_error_details_include_technical_detail(make_bridge):
+    session = FakeSession(fail_with=ErrorCode.CAPTURE_FAILED)
+    session.last_error = "CaptureError: Setting a minimum update interval is not supported"
+    bridge = make_bridge(session)
+    await bridge.start_streaming(source_key(MONITOR), "equilibrada")
+    details = bridge.states[-1]["errorDetails"]
+    assert "Erro: capture_failed" in details
+    assert "minimum update interval" in details
+    assert "Qualidade: equilibrada" in details
+
+    bridge.backToChoose()
+    assert bridge.states[-1]["errorDetails"] == ""
