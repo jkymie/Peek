@@ -40,7 +40,7 @@ Você só precisa de um computador com **Windows 11**.
 
 ### Como transmitir
 
-1. **Baixe o Peek** na página de [Releases](https://github.com/<seu-usuario>/peek/releases) (arquivo `Peek.exe`).
+1. **Baixe o Peek** na página de [Releases](https://github.com/jkymie/Peek/releases/tag/v0.1.0) (arquivo `Peek.exe`).
 2. **Abra o Peek** com dois cliques.
 3. **Escolha o que mostrar:** clique na tela ou na janela que você quer transmitir.
 4. **Clique em "Começar a transmitir".**
